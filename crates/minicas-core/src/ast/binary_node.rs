@@ -9,6 +9,10 @@ pub enum BinaryOp {
     Add,
     /// Binary subtraction
     Sub,
+    /// Binary Multiplication
+    Mul,
+    /// Binary Division
+    Div,
 }
 
 impl BinaryOp {
@@ -17,8 +21,8 @@ impl BinaryOp {
         use BinaryOp::*;
         use Ty::*;
         match (self, ty) {
-            (Add | Sub, Rational) => true,
-            (Add | Sub, Bool) => false,
+            (Add | Sub | Mul | Div, Rational) => true,
+            (Add | Sub | Mul | Div, Bool) => false,
         }
     }
 }
@@ -29,6 +33,8 @@ impl fmt::Display for BinaryOp {
         match self {
             Add => write!(f, "+"),
             Sub => write!(f, "-"),
+            Mul => write!(f, "*"),
+            Div => write!(f, "/"),
         }
     }
 }
@@ -66,6 +72,22 @@ impl Binary {
             rhs: rhs.into(),
         }
     }
+    /// Constructs a new multiplication node.
+    pub fn mul<V1: Into<HN>, V2: Into<HN>>(lhs: V1, rhs: V2) -> Self {
+        Self {
+            op: BinaryOp::Mul,
+            lhs: lhs.into(),
+            rhs: rhs.into(),
+        }
+    }
+    /// Constructs a new division node.
+    pub fn div<V1: Into<HN>, V2: Into<HN>>(lhs: V1, rhs: V2) -> Self {
+        Self {
+            op: BinaryOp::Div,
+            lhs: lhs.into(),
+            rhs: rhs.into(),
+        }
+    }
 
     /// Returns the type of the value execution yields.
     pub fn returns(&self) -> Ty {
@@ -73,6 +95,8 @@ impl Binary {
         match self.op {
             Add => self.lhs.returns(),
             Sub => self.lhs.returns(),
+            Mul => self.lhs.returns(),
+            Div => self.lhs.returns(),
         }
     }
 
@@ -102,6 +126,14 @@ impl Binary {
                 (TyValue::Rational(l), TyValue::Rational(r)) => Ok(TyValue::Rational(l - r)),
                 _ => Err(()),
             },
+            Mul => match (self.lhs.finite_eval()?, self.rhs.finite_eval()?) {
+                (TyValue::Rational(l), TyValue::Rational(r)) => Ok(TyValue::Rational(l * r)),
+                _ => Err(()),
+            },
+            Div => match (self.lhs.finite_eval()?, self.rhs.finite_eval()?) {
+                (TyValue::Rational(l), TyValue::Rational(r)) => Ok(TyValue::Rational(l / r)),
+                _ => Err(()),
+            },
         }
     }
 }
@@ -110,7 +142,7 @@ impl fmt::Display for Binary {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         use BinaryOp::*;
         match self.op {
-            Add | Sub => write!(f, "{} {} {}", self.lhs, self.op, self.rhs),
+            Add | Sub | Mul | Div => write!(f, "{} {} {}", self.lhs, self.op, self.rhs),
         }
     }
 }

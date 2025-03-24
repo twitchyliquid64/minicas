@@ -88,6 +88,8 @@ impl<'a> TryFrom<parse::ParseNode<'a>> for Node {
                 match op {
                     "-" => Ok(NodeInner::Binary(Binary::sub(l, r)).into()),
                     "+" => Ok(NodeInner::Binary(Binary::add(l, r)).into()),
+                    "*" => Ok(NodeInner::Binary(Binary::mul(l, r)).into()),
+                    "/" => Ok(NodeInner::Binary(Binary::div(l, r)).into()),
                     _ => Err(format!("unknown binary op {}", op)),
                 }
             }
@@ -352,6 +354,19 @@ mod tests {
                     .into()
                 )
             )
+        );
+    }
+
+    #[test]
+    fn finite_eval_simple() {
+        assert_eq!(Node::try_from("3 + 5").unwrap().finite_eval(), Ok(8.into()),);
+        assert_eq!(
+            Node::try_from("3 - 5").unwrap().finite_eval(),
+            Ok((-2).into()),
+        );
+        assert_eq!(
+            Node::try_from("9 - 3 * 2").unwrap().finite_eval(),
+            Ok(3.into()),
         );
     }
 }
