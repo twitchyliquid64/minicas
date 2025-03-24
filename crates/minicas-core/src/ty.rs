@@ -88,6 +88,26 @@ impl From<isize> for TyValue {
         TyValue::Rational(BigRational::from_isize(input).unwrap())
     }
 }
+impl From<u32> for TyValue {
+    fn from(input: u32) -> Self {
+        TyValue::Rational(BigRational::from_u32(input).unwrap())
+    }
+}
+impl From<i32> for TyValue {
+    fn from(input: i32) -> Self {
+        TyValue::Rational(BigRational::from_i32(input).unwrap())
+    }
+}
+impl From<u64> for TyValue {
+    fn from(input: u64) -> Self {
+        TyValue::Rational(BigRational::from_u64(input).unwrap())
+    }
+}
+impl From<i64> for TyValue {
+    fn from(input: i64) -> Self {
+        TyValue::Rational(BigRational::from_i64(input).unwrap())
+    }
+}
 impl From<f32> for TyValue {
     fn from(input: f32) -> Self {
         TyValue::Rational(BigRational::from_f32(input).unwrap())

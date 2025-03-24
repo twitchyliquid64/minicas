@@ -5,3 +5,6 @@ resolver = "2"
 [workspace.dependencies]
 num-traits = { version = "^0.2", default-features = false }
 num = { version = "^0.4" }
+
+nom = "8.0"
+nom-language = "0.1.0"

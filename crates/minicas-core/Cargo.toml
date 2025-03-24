@@ -6,6 +6,13 @@ license = "MIT OR Apache-2.0"
 
 rust-version = "1.78"
 
+[features]
+default = ["parsing"]
+parsing = ["dep:nom", "dep:nom-language"]
+
 [dependencies]
 num.workspace = true
 num-traits.workspace = true
+
+nom = { workspace = true, optional = true}
+nom-language = { workspace = true, optional = true}

@@ -11,6 +11,8 @@ pub use binary_node::{Binary, BinaryOp};
 mod unary_node;
 pub use unary_node::{Unary, UnaryOp};
 
+mod parse;
+
 // TODO: Real error type
 pub type EvalError = ();
 
@@ -57,6 +59,50 @@ impl AstNode for Node {
 impl fmt::Display for Node {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt::Display::fmt(&self.n, f)
+    }
+}
+
+impl From<NodeInner> for Node {
+    fn from(n: NodeInner) -> Self {
+        Self { n }
+    }
+}
+
+impl<'a> TryFrom<parse::ParseNode<'a>> for Node {
+    type Error = String;
+
+    fn try_from(n: parse::ParseNode<'a>) -> Result<Self, Self::Error> {
+        use parse::ParseNode;
+        match n {
+            ParseNode::Bool(b) => Ok(NodeInner::Const(b.into()).into()),
+            ParseNode::Int(i) => Ok(NodeInner::Const(i.into()).into()),
+            ParseNode::Unary { op, operand } => {
+                let i = Node::try_from(*operand)?;
+                match op {
+                    "-" => Ok(NodeInner::Unary(Unary::negate(i)).into()),
+                    _ => Err(format!("unknown unary op {}", op)),
+                }
+            }
+            ParseNode::Binary { op, lhs, rhs } => {
+                let (l, r) = (Node::try_from(*lhs)?, Node::try_from(*rhs)?);
+                match op {
+                    "-" => Ok(NodeInner::Binary(Binary::sub(l, r)).into()),
+                    "+" => Ok(NodeInner::Binary(Binary::add(l, r)).into()),
+                    _ => Err(format!("unknown binary op {}", op)),
+                }
+            }
+        }
+    }
+}
+
+impl<'a> TryFrom<&'a str> for Node {
+    type Error = String;
+
+    fn try_from(s: &'a str) -> Result<Self, Self::Error> {
+        match parse::parse(s) {
+            Ok((_, pn)) => Node::try_from(pn),
+            Err(e) => Err(format!("parse err: {}", e)),
+        }
     }
 }
 
@@ -243,6 +289,11 @@ impl From<Const> for NodeInner {
         Self::Const(n)
     }
 }
+impl From<Binary> for NodeInner {
+    fn from(n: Binary) -> Self {
+        Self::Binary(n)
+    }
+}
 impl From<Unary> for NodeInner {
     fn from(n: Unary) -> Self {
         Self::Unary(n)
@@ -256,5 +307,51 @@ impl fmt::Display for NodeInner {
             Self::Unary(u) => fmt::Display::fmt(u, f),
             Self::Binary(b) => fmt::Display::fmt(b, f),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_basic() {
+        assert_eq!(
+            Node::try_from("3 + 5"),
+            Ok(Node::new(
+                Binary::add::<TyValue, TyValue>(3.into(), 5.into()).into()
+            )),
+        );
+        assert_eq!(
+            Node::try_from("-5"),
+            Ok(Node::new(Unary::negate::<TyValue>(5.into()).into())),
+        );
+        assert_eq!(
+            Node::try_from("3--5"),
+            Ok(Node::new(
+                Binary::sub::<TyValue, HN>(
+                    3.into(),
+                    Node::new(Unary::negate::<TyValue>(5.into()).into()).into(),
+                )
+                .into()
+            )),
+        );
+    }
+
+    #[test]
+    fn fmt_basic() {
+        assert_eq!(
+            "3 - -5",
+            format!(
+                "{}",
+                Node::new(
+                    Binary::sub::<TyValue, HN>(
+                        3.into(),
+                        Node::new(Unary::negate::<TyValue>(5.into()).into()).into(),
+                    )
+                    .into()
+                )
+            )
+        );
     }
 }
