@@ -6,6 +6,8 @@ use crate::ty::{Ty, TyValue};
 
 mod const_node;
 pub use const_node::Const;
+mod binary_node;
+pub use binary_node::{Binary, BinaryOp};
 mod unary_node;
 pub use unary_node::{Unary, UnaryOp};
 
@@ -161,6 +163,8 @@ pub enum NodeInner {
     Const(Const),
     /// An operation which takes a single operand.
     Unary(Unary),
+    /// An operation which takes two operands.
+    Binary(Binary),
 }
 
 impl NodeInner {
@@ -178,6 +182,13 @@ impl NodeInner {
             _ => None,
         }
     }
+    /// Returns a ref to the inner [Binary] if this node is that variant.
+    pub fn as_binary(&self) -> Option<&Binary> {
+        match self {
+            Self::Binary(b) => Some(b),
+            _ => None,
+        }
+    }
 }
 
 impl AstNode for NodeInner {
@@ -185,6 +196,7 @@ impl AstNode for NodeInner {
         match self {
             Self::Const(c) => c.returns(),
             Self::Unary(u) => u.returns(),
+            Self::Binary(b) => b.returns(),
         }
     }
 
@@ -192,12 +204,16 @@ impl AstNode for NodeInner {
         match self {
             Self::Const(_) => [None, None].into_iter().flatten(),
             Self::Unary(u) => [Some(u.operand().returns()), None].into_iter().flatten(),
+            Self::Binary(b) => [Some(b.lhs().returns()), Some(b.lhs().returns())]
+                .into_iter()
+                .flatten(),
         }
     }
     fn finite_eval(&self) -> Result<TyValue, EvalError> {
         match self {
             Self::Const(c) => Ok(c.value()),
             Self::Unary(u) => u.finite_eval(),
+            Self::Binary(b) => b.finite_eval(),
         }
     }
 
@@ -210,6 +226,10 @@ impl AstNode for NodeInner {
         match self {
             Self::Unary(u) => {
                 u.operand().walk(cb);
+            }
+            Self::Binary(b) => {
+                b.lhs().walk(cb);
+                b.rhs().walk(cb);
             }
 
             // nothing contained to walk
@@ -234,6 +254,7 @@ impl fmt::Display for NodeInner {
         match self {
             Self::Const(c) => fmt::Display::fmt(c, f),
             Self::Unary(u) => fmt::Display::fmt(u, f),
+            Self::Binary(b) => fmt::Display::fmt(b, f),
         }
     }
 }

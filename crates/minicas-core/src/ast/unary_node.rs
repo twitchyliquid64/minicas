@@ -3,7 +3,7 @@ use crate::{Ty, TyValue};
 use std::fmt;
 
 /// UnaryOp enumerates the types of unary operations.
-#[derive(Debug, Clone, Copy, PartialEq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum UnaryOp {
     Negate,
 }
