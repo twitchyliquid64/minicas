@@ -13,8 +13,11 @@ pub use unary_node::{Unary, UnaryOp};
 
 mod parse;
 
-// TODO: Real error type
-pub type EvalError = ();
+#[derive(Debug, Clone, PartialEq, Hash)]
+pub enum EvalError {
+    DivByZero,
+    UnexpectedType(Ty, Ty),
+}
 
 pub trait AstNode: Clone + Sized + std::fmt::Debug {
     /// Returns the type of the value this node yields.

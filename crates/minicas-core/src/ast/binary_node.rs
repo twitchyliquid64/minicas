@@ -1,5 +1,6 @@
 use crate::ast::{AstNode, EvalError, HN};
 use crate::{Ty, TyValue};
+use num::CheckedDiv;
 use std::fmt;
 
 /// BinaryOp enumerates the types of binary operations.
@@ -120,19 +121,22 @@ impl Binary {
         match self.op {
             Add => match (self.lhs.finite_eval()?, self.rhs.finite_eval()?) {
                 (TyValue::Rational(l), TyValue::Rational(r)) => Ok(TyValue::Rational(l + r)),
-                _ => Err(()),
+                (lv, rv) => Err(EvalError::UnexpectedType(lv.ty(), rv.ty())),
             },
             Sub => match (self.lhs.finite_eval()?, self.rhs.finite_eval()?) {
                 (TyValue::Rational(l), TyValue::Rational(r)) => Ok(TyValue::Rational(l - r)),
-                _ => Err(()),
+                (lv, rv) => Err(EvalError::UnexpectedType(lv.ty(), rv.ty())),
             },
             Mul => match (self.lhs.finite_eval()?, self.rhs.finite_eval()?) {
                 (TyValue::Rational(l), TyValue::Rational(r)) => Ok(TyValue::Rational(l * r)),
-                _ => Err(()),
+                (lv, rv) => Err(EvalError::UnexpectedType(lv.ty(), rv.ty())),
             },
             Div => match (self.lhs.finite_eval()?, self.rhs.finite_eval()?) {
-                (TyValue::Rational(l), TyValue::Rational(r)) => Ok(TyValue::Rational(l / r)),
-                _ => Err(()),
+                (TyValue::Rational(l), TyValue::Rational(r)) => match l.checked_div(&r) {
+                    Some(o) => Ok(TyValue::Rational(o)),
+                    None => Err(EvalError::DivByZero),
+                },
+                (lv, rv) => Err(EvalError::UnexpectedType(lv.ty(), rv.ty())),
             },
         }
     }
@@ -163,6 +167,24 @@ mod tests {
         assert_eq!(
             Binary::sub::<TyValue, TyValue>(2usize.into(), 3usize.into()).finite_eval(),
             Ok((-1isize).into())
+        );
+    }
+    #[test]
+    fn mul_finite_eval() {
+        assert_eq!(
+            Binary::mul::<TyValue, TyValue>(2usize.into(), 3usize.into()).finite_eval(),
+            Ok((6usize).into())
+        );
+    }
+    #[test]
+    fn div_finite_eval() {
+        assert_eq!(
+            Binary::div::<TyValue, TyValue>(4usize.into(), 2usize.into()).finite_eval(),
+            Ok((2usize).into())
+        );
+        assert_eq!(
+            Binary::div::<TyValue, TyValue>(4usize.into(), 0usize.into()).finite_eval(),
+            Err(EvalError::DivByZero)
         );
     }
 }
