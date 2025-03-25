@@ -13,7 +13,7 @@ pub use unary_node::{Unary, UnaryOp};
 
 mod parse;
 mod typecheck;
-pub use typecheck::typecheck;
+pub use typecheck::{typecheck, TypeError};
 
 #[derive(Debug, Clone, PartialEq, Hash)]
 pub enum EvalError {
@@ -81,6 +81,9 @@ impl<'a> TryFrom<parse::ParseNode<'a>> for Node {
         match n {
             ParseNode::Bool(b) => Ok(NodeInner::Const(b.into()).into()),
             ParseNode::Int(i) => Ok(NodeInner::Const(i.into()).into()),
+            ParseNode::Float(f) => {
+                Ok(NodeInner::Const((num::rational::Ratio::from_float(f).unwrap()).into()).into())
+            }
             ParseNode::Unary { op, operand } => {
                 let i = Node::try_from(*operand)?;
                 match op {
@@ -364,7 +367,10 @@ mod tests {
 
     #[test]
     fn finite_eval_simple() {
-        assert_eq!(Node::try_from("3 + 5").unwrap().finite_eval(), Ok(8.into()),);
+        assert_eq!(
+            Node::try_from("3.5 + 4.5").unwrap().finite_eval(),
+            Ok(8.into()),
+        );
         assert_eq!(
             Node::try_from("3 - 5").unwrap().finite_eval(),
             Ok((-2).into()),

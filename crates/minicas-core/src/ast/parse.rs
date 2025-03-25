@@ -12,6 +12,7 @@ use nom_language::precedence::{binary_op, unary_op, Assoc, Operation};
 #[derive(Clone, Debug, PartialEq)]
 pub enum ParseNode<'a> {
     Int(i64),
+    Float(f64),
     Bool(bool),
     Unary {
         op: &'a str,
@@ -42,6 +43,19 @@ fn parser(i: &str) -> IResult<&str, ParseNode> {
             )),
         ),
         alt((
+            map_res(
+                preceded(multispace0, (digit1, tag("."), digit1)),
+                |(major, _dot, minor): (&str, &str, &str)| {
+                    let mut s = String::from(major);
+                    s.push_str(".");
+                    s.push_str(minor);
+
+                    if let Ok(f) = s.parse::<f64>() {
+                        return Ok(ParseNode::Float(f));
+                    }
+                    Err(())
+                },
+            ),
             map_res(preceded(multispace0, digit1), |s: &str| {
                 if let Ok(i) = s.parse::<i64>() {
                     return Ok(ParseNode::Int(i));
@@ -77,6 +91,7 @@ fn parser(i: &str) -> IResult<&str, ParseNode> {
 #[test]
 fn literals() {
     assert_eq!(parser("3"), Ok(("", ParseNode::Int(3))));
+    assert_eq!(parser("2.5"), Ok(("", ParseNode::Float(2.5))));
     assert_eq!(parser("true"), Ok(("", ParseNode::Bool(true))));
     assert_eq!(parser("false "), Ok((" ", ParseNode::Bool(false))));
 }
