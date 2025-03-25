@@ -32,6 +32,18 @@ pub trait AstNode: Clone + Sized + std::fmt::Debug {
     /// Recursively executes the given function on every node in the AST.
     /// The walk will end early if the given function returns false.
     fn walk(&self, cb: &mut impl FnMut(&NodeInner) -> bool);
+
+    /// Returns the concrete variant this AST node represents.
+    fn as_inner(&self) -> &NodeInner;
+    /// Iterates through the child nodes of this node.
+    fn iter_children(&self) -> impl Iterator<Item = &NodeInner>;
+
+    /// Returns the nested child described by the given sequence.
+    ///
+    /// Each entry describes where to branch when recursively fetching
+    /// the referenced node. A value of 0 means the left-hand side or unary
+    /// operand, and a value of 1 means the right-hand side operand.
+    fn get<I: Iterator<Item = usize>>(&self, i: I) -> Option<&NodeInner>;
 }
 
 /// High-level type representing any node.
@@ -58,6 +70,15 @@ impl AstNode for Node {
     }
     fn walk(&self, cb: &mut impl FnMut(&NodeInner) -> bool) {
         self.n.walk(cb)
+    }
+    fn as_inner(&self) -> &NodeInner {
+        self.n.as_inner()
+    }
+    fn iter_children(&self) -> impl Iterator<Item = &NodeInner> {
+        self.n.iter_children()
+    }
+    fn get<I: Iterator<Item = usize>>(&self, mut i: I) -> Option<&NodeInner> {
+        self.n.get(&mut i)
     }
 }
 
@@ -171,6 +192,15 @@ impl AstNode for HN {
     fn walk(&self, cb: &mut impl FnMut(&NodeInner) -> bool) {
         self.0.walk(cb)
     }
+    fn as_inner(&self) -> &NodeInner {
+        self.0.as_inner()
+    }
+    fn iter_children(&self) -> impl Iterator<Item = &NodeInner> {
+        self.0.iter_children()
+    }
+    fn get<I: Iterator<Item = usize>>(&self, i: I) -> Option<&NodeInner> {
+        self.0.get(i)
+    }
 }
 
 impl Deref for HN {
@@ -224,6 +254,10 @@ pub enum NodeInner {
 }
 
 impl NodeInner {
+    pub fn new_const<V: Into<TyValue>>(v: V) -> Self {
+        Self::Const(Const::new(v.into()))
+    }
+
     /// Returns a ref to the inner [Const] if this node is that variant.
     pub fn as_const(&self) -> Option<&Const> {
         match self {
@@ -243,6 +277,23 @@ impl NodeInner {
         match self {
             Self::Binary(b) => Some(b),
             _ => None,
+        }
+    }
+
+    /// Returns the nested child described by the given sequence.
+    ///
+    /// Each entry describes where to branch when recursively fetching
+    /// the referenced node. A value of 0 means the left-hand side or unary
+    /// operand, and a value of 1 means the right-hand side operand.
+    fn get<I: Iterator<Item = usize>>(&self, i: &mut I) -> Option<&NodeInner> {
+        match i.next() {
+            Some(idx) => match (self, idx) {
+                (Self::Unary(u), 0) => (*u.operand()).n.get(i),
+                (Self::Binary(b), 0) => (*b.lhs()).n.get(i),
+                (Self::Binary(b), 1) => (*b.rhs()).n.get(i),
+                _ => None,
+            },
+            None => Some(self),
         }
     }
 }
@@ -291,6 +342,24 @@ impl AstNode for NodeInner {
             // nothing contained to walk
             Self::Const(_) => {}
         }
+    }
+
+    fn as_inner(&self) -> &NodeInner {
+        self
+    }
+
+    fn iter_children(&self) -> impl Iterator<Item = &NodeInner> {
+        match self {
+            Self::Const(_) => [None, None].into_iter().flatten(),
+            Self::Unary(u) => [Some(&u.operand().0.n), None].into_iter().flatten(),
+            Self::Binary(b) => [Some(&b.lhs().0.n), Some(&b.rhs().0.n)]
+                .into_iter()
+                .flatten(),
+        }
+    }
+
+    fn get<I: Iterator<Item = usize>>(&self, mut i: I) -> Option<&NodeInner> {
+        NodeInner::get(self, &mut i)
     }
 }
 
@@ -378,6 +447,33 @@ mod tests {
         assert_eq!(
             Node::try_from("9 - 3 * 2").unwrap().finite_eval(),
             Ok(3.into()),
+        );
+    }
+
+    #[test]
+    fn get() {
+        assert_eq!(
+            Node::try_from("3 + 2*5").unwrap().get(vec![0].into_iter()),
+            Some(&NodeInner::new_const(3)),
+        );
+        assert_eq!(
+            Node::try_from("3 + 2*5")
+                .unwrap()
+                .get(vec![1, 0].into_iter()),
+            Some(&NodeInner::new_const(2)),
+        );
+        assert_eq!(
+            Node::try_from("3 + 2*5").unwrap().get(vec![1].into_iter()),
+            Some(Node::try_from("2 * 5").unwrap().as_inner()),
+        );
+        assert_eq!(
+            Node::try_from("3 + 2*5").unwrap().get(vec![].into_iter()),
+            Some(Node::try_from("3 + 2 * 5").unwrap().as_inner()),
+        );
+
+        assert_eq!(
+            Node::try_from("3 + 2*5").unwrap().get(vec![99].into_iter()),
+            None,
         );
     }
 }
