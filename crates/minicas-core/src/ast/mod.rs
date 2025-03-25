@@ -12,6 +12,8 @@ mod unary_node;
 pub use unary_node::{Unary, UnaryOp};
 
 mod parse;
+mod typecheck;
+pub use typecheck::typecheck;
 
 #[derive(Debug, Clone, PartialEq, Hash)]
 pub enum EvalError {

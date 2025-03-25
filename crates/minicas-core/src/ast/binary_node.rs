@@ -18,12 +18,12 @@ pub enum BinaryOp {
 
 impl BinaryOp {
     /// Returns true if the given type is valid as an operand to this node.
-    pub fn descendant_compatible(&self, ty: Ty) -> bool {
+    pub fn descendant_compatible(&self, lhs: Ty, rhs: Ty) -> bool {
         use BinaryOp::*;
         use Ty::*;
-        match (self, ty) {
-            (Add | Sub | Mul | Div, Rational) => true,
-            (Add | Sub | Mul | Div, Bool) => false,
+        match (self, lhs, rhs) {
+            (Add | Sub | Mul | Div, Rational, Rational) => true,
+            (Add | Sub | Mul | Div, _, _) => false,
         }
     }
 }
@@ -43,9 +43,9 @@ impl fmt::Display for BinaryOp {
 /// AST object representing an operation over two operands.
 #[derive(Debug, Clone, PartialEq, Hash)]
 pub struct Binary {
-    op: BinaryOp,
-    lhs: HN,
-    rhs: HN,
+    pub op: BinaryOp,
+    pub lhs: HN,
+    pub rhs: HN,
 }
 
 impl Binary {
