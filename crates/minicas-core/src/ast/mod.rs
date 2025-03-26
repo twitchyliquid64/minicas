@@ -30,8 +30,9 @@ pub trait AstNode: Clone + Sized + std::fmt::Debug {
     fn finite_eval(&self) -> Result<TyValue, EvalError>;
 
     /// Recursively executes the given function on every node in the AST.
-    /// The walk will end early if the given function returns false.
-    fn walk(&self, cb: &mut impl FnMut(&NodeInner) -> bool);
+    /// The walk will end early if the given function returns false and
+    /// the invocation was not depth first.
+    fn walk(&self, depth_first: bool, cb: &mut impl FnMut(&NodeInner) -> bool);
 
     /// Returns the concrete variant this AST node represents.
     fn as_inner(&self) -> &NodeInner;
@@ -68,8 +69,8 @@ impl AstNode for Node {
     fn finite_eval(&self) -> Result<TyValue, EvalError> {
         self.n.finite_eval()
     }
-    fn walk(&self, cb: &mut impl FnMut(&NodeInner) -> bool) {
-        self.n.walk(cb)
+    fn walk(&self, depth_first: bool, cb: &mut impl FnMut(&NodeInner) -> bool) {
+        self.n.walk(depth_first, cb)
     }
     fn as_inner(&self) -> &NodeInner {
         self.n.as_inner()
@@ -189,8 +190,8 @@ impl AstNode for HN {
     fn finite_eval(&self) -> Result<TyValue, EvalError> {
         self.0.finite_eval()
     }
-    fn walk(&self, cb: &mut impl FnMut(&NodeInner) -> bool) {
-        self.0.walk(cb)
+    fn walk(&self, depth_first: bool, cb: &mut impl FnMut(&NodeInner) -> bool) {
+        self.0.walk(depth_first, cb)
     }
     fn as_inner(&self) -> &NodeInner {
         self.0.as_inner()
@@ -324,23 +325,31 @@ impl AstNode for NodeInner {
         }
     }
 
-    fn walk(&self, cb: &mut impl FnMut(&NodeInner) -> bool) {
-        if !cb(self) {
-            return;
+    fn walk(&self, depth_first: bool, cb: &mut impl FnMut(&NodeInner) -> bool) {
+        if !depth_first {
+            if !cb(self) {
+                return;
+            }
         }
 
         // recurse to sub-expressions
         match self {
             Self::Unary(u) => {
-                u.operand().walk(cb);
+                u.operand().walk(depth_first, cb);
             }
             Self::Binary(b) => {
-                b.lhs().walk(cb);
-                b.rhs().walk(cb);
+                b.lhs().walk(depth_first, cb);
+                b.rhs().walk(depth_first, cb);
             }
 
             // nothing contained to walk
             Self::Const(_) => {}
+        }
+
+        if depth_first {
+            if !cb(self) {
+                return;
+            }
         }
     }
 

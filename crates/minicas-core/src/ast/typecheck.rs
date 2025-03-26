@@ -11,7 +11,7 @@ pub enum TypeError {
 /// Checks an AST for type errors.
 pub fn typecheck<N: AstNode>(n: &N) -> Result<(), TypeError> {
     let mut err = Ok(());
-    n.walk(&mut |n| match n {
+    n.walk(false, &mut |n| match n {
         NodeInner::Const(_) => true,
 
         NodeInner::Unary(Unary { op, val }) => {
