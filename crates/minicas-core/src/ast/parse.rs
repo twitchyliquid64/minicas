@@ -97,6 +97,69 @@ fn literals() {
 }
 
 #[test]
+fn parenthesis() {
+    assert_eq!(parser("(3)"), Ok(("", ParseNode::Int(3))));
+    assert_eq!(
+        parser("(-3)"),
+        Ok((
+            "",
+            ParseNode::Unary {
+                op: &"-",
+                operand: Box::new(ParseNode::Int(3)),
+            }
+        ))
+    );
+
+    assert_eq!(
+        parser("-(3)"),
+        Ok((
+            "",
+            ParseNode::Unary {
+                op: &"-",
+                operand: Box::new(ParseNode::Int(3)),
+            }
+        ))
+    );
+    assert_eq!(
+        parser("-((4 - 3) + 2)"),
+        Ok((
+            "",
+            ParseNode::Unary {
+                op: &"-",
+                operand: Box::new(ParseNode::Binary {
+                    op: &"+",
+                    lhs: Box::new(ParseNode::Binary {
+                        op: &"-",
+                        lhs: Box::new(ParseNode::Int(4)),
+                        rhs: Box::new(ParseNode::Int(3)),
+                    }),
+                    rhs: Box::new(ParseNode::Int(2)),
+                }),
+            }
+        ))
+    );
+}
+
+#[test]
+fn op_precedence() {
+    assert_eq!(
+        parser("2 - 3 * 2"),
+        Ok((
+            "",
+            ParseNode::Binary {
+                op: &"-",
+                lhs: Box::new(ParseNode::Int(2)),
+                rhs: Box::new(ParseNode::Binary {
+                    op: &"*",
+                    lhs: Box::new(ParseNode::Int(3)),
+                    rhs: Box::new(ParseNode::Int(2)),
+                }),
+            }
+        ))
+    );
+}
+
+#[test]
 fn basic() {
     assert_eq!(
         parser("-3"),
