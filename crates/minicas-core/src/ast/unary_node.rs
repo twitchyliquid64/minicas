@@ -10,7 +10,7 @@ pub enum UnaryOp {
 }
 
 impl UnaryOp {
-    /// Returns true if the given type is valid as an operand to this node.
+    /// Returns true if the given type is valid as an operand for this operation.
     pub fn descendant_compatible(&self, ty: Option<Ty>) -> bool {
         use Ty::*;
         use UnaryOp::*;

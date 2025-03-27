@@ -25,7 +25,7 @@ pub enum BinaryOp {
 }
 
 impl BinaryOp {
-    /// Returns true if the given type is valid as an operand to this node.
+    /// Returns true if the given not-None types are valid as operands for this operation.
     pub fn descendant_compatible(&self, lhs: Option<Ty>, rhs: Option<Ty>) -> bool {
         use BinaryOp::*;
         use Ty::*;
@@ -35,6 +35,24 @@ impl BinaryOp {
             (Cmp(CmpOp::Equals), Some(Rational) | None, Some(Rational) | None) => true,
             (Cmp(CmpOp::Equals), Some(Bool) | None, Some(Bool) | None) => true,
             (Cmp(CmpOp::Equals), _, _) => false,
+        }
+    }
+
+    /// Returns true if the operation is associative, or false otherwise.
+    pub fn associative(&self) -> bool {
+        use BinaryOp::*;
+        match self {
+            Add | Mul => true,
+            _ => false,
+        }
+    }
+
+    /// Returns true if the operation is commutative, or false otherwise.
+    pub fn commutative(&self) -> bool {
+        use BinaryOp::*;
+        match self {
+            Add | Mul => true,
+            _ => false,
         }
     }
 }

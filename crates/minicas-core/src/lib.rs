@@ -3,3 +3,5 @@ mod ty;
 pub use ty::{Ty, TyValue};
 
 pub mod pred;
+
+pub mod rules;

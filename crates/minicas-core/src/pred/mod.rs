@@ -24,6 +24,25 @@ impl PredicateOp {
     }
 }
 
+impl TryFrom<&str> for PredicateOp {
+    type Error = ();
+
+    fn try_from(s: &str) -> Result<Self, Self::Error> {
+        match s {
+            "const" => Ok(Self::Const),
+            "var" => Ok(Self::Var),
+
+            "neg" => Ok(Self::Unary(UnaryOp::Negate)),
+            "abs" => Ok(Self::Unary(UnaryOp::Abs)),
+            "-" => Ok(Self::Binary(BinaryOp::Sub)),
+            "+" => Ok(Self::Binary(BinaryOp::Add)),
+            "/" => Ok(Self::Binary(BinaryOp::Div)),
+            "*" => Ok(Self::Binary(BinaryOp::Mul)),
+            _ => Err(()),
+        }
+    }
+}
+
 /// Describes a predicate on an AST node.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Hash)]
 pub struct Predicate {
