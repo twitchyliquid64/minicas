@@ -6,6 +6,7 @@ use std::fmt;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum UnaryOp {
     Negate,
+    Abs,
 }
 
 impl UnaryOp {
@@ -15,6 +16,8 @@ impl UnaryOp {
         use UnaryOp::*;
         match (self, ty) {
             (Negate, Some(Bool) | Some(Rational) | None) => true,
+            (Abs, Some(Rational) | None) => true,
+            (Abs, Some(Bool)) => false,
         }
     }
 }
@@ -24,6 +27,7 @@ impl fmt::Display for UnaryOp {
         use UnaryOp::*;
         match self {
             Negate => write!(f, "-"),
+            Abs => write!(f, "abs"),
         }
     }
 }
@@ -47,6 +51,13 @@ impl Unary {
     pub fn negate<V: Into<HN>>(operand: V) -> Self {
         Self {
             op: UnaryOp::Negate,
+            val: operand.into(),
+        }
+    }
+    /// Constructs a new absolute value node.
+    pub fn abs<V: Into<HN>>(operand: V) -> Self {
+        Self {
+            op: UnaryOp::Abs,
             val: operand.into(),
         }
     }
@@ -78,6 +89,13 @@ impl Unary {
                 TyValue::Rational(r) => Ok(TyValue::Rational(-r)),
                 TyValue::Bool(b) => Ok(TyValue::Bool(!b)),
             },
+            Abs => {
+                use num::Signed;
+                match self.val.finite_eval(ctx)? {
+                    TyValue::Rational(r) => Ok(TyValue::Rational(r.abs())),
+                    TyValue::Bool(_) => Err(EvalError::UnexpectedType(vec![Ty::Bool])),
+                }
+            }
         }
     }
 }
@@ -87,6 +105,7 @@ impl fmt::Display for Unary {
         use UnaryOp::*;
         match self.op {
             Negate => write!(f, "-{}", self.val),
+            Abs => write!(f, "|{}|", self.val),
         }
     }
 }
@@ -104,6 +123,18 @@ mod tests {
         assert_eq!(
             Unary::negate::<TyValue>(2usize.into()).finite_eval(&()),
             Ok((-2isize).into())
+        );
+    }
+
+    #[test]
+    fn abs_finite_eval() {
+        assert_eq!(
+            Unary::abs(TyValue::from(-3)).finite_eval(&()),
+            Ok(TyValue::from(3))
+        );
+        assert_eq!(
+            Unary::abs(TyValue::from(3)).finite_eval(&()),
+            Ok(TyValue::from(3))
         );
     }
 }

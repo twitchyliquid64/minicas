@@ -24,7 +24,7 @@ pub use typecheck::{typecheck, TypeError};
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum EvalError {
     DivByZero,
-    UnexpectedType(Ty, Ty),
+    UnexpectedType(Vec<Ty>),
     UnknownIdent(String),
 }
 
@@ -151,6 +151,10 @@ impl<'a> TryFrom<parse::ParseNode<'a>> for Node {
             ))
             .into()),
 
+            ParseNode::Abs(operand) => {
+                let i = Node::try_from(*operand)?;
+                Ok(NodeInner::Unary(Unary::abs(i)).into())
+            }
             ParseNode::Unary { op, operand } => {
                 let i = Node::try_from(*operand)?;
                 match op {

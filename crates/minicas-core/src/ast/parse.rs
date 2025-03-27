@@ -20,6 +20,7 @@ pub enum ParseNode<'a> {
         op: &'a str,
         operand: Box<ParseNode<'a>>,
     },
+    Abs(Box<ParseNode<'a>>),
     Binary {
         op: &'a str,
         lhs: Box<ParseNode<'a>>,
@@ -83,6 +84,10 @@ fn parser(i: &str) -> IResult<&str, ParseNode> {
             map_res(preceded(multispace0, alpha1), |s: &str| {
                 Ok::<ParseNode<'_>, ()>(ParseNode::Ident(s.into()))
             }),
+            map_res(
+                preceded(multispace0, delimited(tag("|"), parser, tag("|"))),
+                |n| Ok::<ParseNode<'_>, ()>(ParseNode::Abs(Box::new(n))),
+            ),
             preceded(multispace0, delimited(tag("("), parser, tag(")"))),
         )),
         |op: Operation<&str, (), &str, ParseNode>| {
@@ -118,6 +123,14 @@ fn vars() {
     assert_eq!(
         parser("2x"),
         Ok(("", ParseNode::IdentWithCoefficient(2, "x".into())))
+    );
+}
+
+#[test]
+fn abs() {
+    assert_eq!(
+        parser("|3|"),
+        Ok(("", ParseNode::Abs(Box::new(ParseNode::Int(3)))))
     );
 }
 

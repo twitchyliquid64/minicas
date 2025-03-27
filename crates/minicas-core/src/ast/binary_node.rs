@@ -150,27 +150,27 @@ impl Binary {
         match self.op {
             Add => match (self.lhs.finite_eval(c)?, self.rhs.finite_eval(c)?) {
                 (TyValue::Rational(l), TyValue::Rational(r)) => Ok(TyValue::Rational(l + r)),
-                (lv, rv) => Err(EvalError::UnexpectedType(lv.ty(), rv.ty())),
+                (lv, rv) => Err(EvalError::UnexpectedType(vec![lv.ty(), rv.ty()])),
             },
             Sub => match (self.lhs.finite_eval(c)?, self.rhs.finite_eval(c)?) {
                 (TyValue::Rational(l), TyValue::Rational(r)) => Ok(TyValue::Rational(l - r)),
-                (lv, rv) => Err(EvalError::UnexpectedType(lv.ty(), rv.ty())),
+                (lv, rv) => Err(EvalError::UnexpectedType(vec![lv.ty(), rv.ty()])),
             },
             Mul => match (self.lhs.finite_eval(c)?, self.rhs.finite_eval(c)?) {
                 (TyValue::Rational(l), TyValue::Rational(r)) => Ok(TyValue::Rational(l * r)),
-                (lv, rv) => Err(EvalError::UnexpectedType(lv.ty(), rv.ty())),
+                (lv, rv) => Err(EvalError::UnexpectedType(vec![lv.ty(), rv.ty()])),
             },
             Div => match (self.lhs.finite_eval(c)?, self.rhs.finite_eval(c)?) {
                 (TyValue::Rational(l), TyValue::Rational(r)) => match l.checked_div(&r) {
                     Some(o) => Ok(TyValue::Rational(o)),
                     None => Err(EvalError::DivByZero),
                 },
-                (lv, rv) => Err(EvalError::UnexpectedType(lv.ty(), rv.ty())),
+                (lv, rv) => Err(EvalError::UnexpectedType(vec![lv.ty(), rv.ty()])),
             },
             Cmp(CmpOp::Equals) => match (self.lhs.finite_eval(c)?, self.rhs.finite_eval(c)?) {
                 (TyValue::Rational(l), TyValue::Rational(r)) => Ok(TyValue::Bool(l == r)),
                 (TyValue::Bool(l), TyValue::Bool(r)) => Ok(TyValue::Bool(l == r)),
-                (lv, rv) => Err(EvalError::UnexpectedType(lv.ty(), rv.ty())),
+                (lv, rv) => Err(EvalError::UnexpectedType(vec![lv.ty(), rv.ty()])),
             },
         }
     }
