@@ -4,8 +4,8 @@ use crate::Ty;
 /// Describes issues with an AST due to invalid type + operation combinations.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum TypeError {
-    UnaryIncompatible(UnaryOp, Ty),
-    BinaryIncompatible(BinaryOp, Ty, Ty),
+    UnaryIncompatible(UnaryOp, Option<Ty>),
+    BinaryIncompatible(BinaryOp, Option<Ty>, Option<Ty>),
 }
 
 /// Checks an AST for type errors.
@@ -56,16 +56,16 @@ mod tests {
             typecheck(&Node::try_from("true + 1").unwrap()),
             Err(TypeError::BinaryIncompatible(
                 BinaryOp::Add,
-                Ty::Bool,
-                Ty::Rational
+                Some(Ty::Bool),
+                Some(Ty::Rational)
             )),
         );
         assert_eq!(
             typecheck(&Node::try_from("2 * 3 + false").unwrap()),
             Err(TypeError::BinaryIncompatible(
                 BinaryOp::Add,
-                Ty::Rational,
-                Ty::Bool,
+                Some(Ty::Rational),
+                Some(Ty::Bool),
             )),
         );
     }

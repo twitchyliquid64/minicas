@@ -10,11 +10,11 @@ pub enum UnaryOp {
 
 impl UnaryOp {
     /// Returns true if the given type is valid as an operand to this node.
-    pub fn descendant_compatible(&self, ty: Ty) -> bool {
+    pub fn descendant_compatible(&self, ty: Option<Ty>) -> bool {
         use Ty::*;
         use UnaryOp::*;
         match (self, ty) {
-            (Negate, Bool | Rational) => true,
+            (Negate, Some(Bool) | Some(Rational) | None) => true,
         }
     }
 }
@@ -52,7 +52,7 @@ impl Unary {
     }
 
     /// Returns the type of the value execution yields.
-    pub fn returns(&self) -> Ty {
+    pub fn returns(&self) -> Option<Ty> {
         return self.val.returns();
     }
 

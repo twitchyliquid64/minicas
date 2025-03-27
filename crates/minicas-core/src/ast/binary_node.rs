@@ -26,14 +26,14 @@ pub enum BinaryOp {
 
 impl BinaryOp {
     /// Returns true if the given type is valid as an operand to this node.
-    pub fn descendant_compatible(&self, lhs: Ty, rhs: Ty) -> bool {
+    pub fn descendant_compatible(&self, lhs: Option<Ty>, rhs: Option<Ty>) -> bool {
         use BinaryOp::*;
         use Ty::*;
         match (self, lhs, rhs) {
-            (Add | Sub | Mul | Div, Rational, Rational) => true,
+            (Add | Sub | Mul | Div, Some(Rational) | None, Some(Rational) | None) => true,
             (Add | Sub | Mul | Div, _, _) => false,
-            (Cmp(CmpOp::Equals), Rational, Rational) => true,
-            (Cmp(CmpOp::Equals), Bool, Bool) => true,
+            (Cmp(CmpOp::Equals), Some(Rational) | None, Some(Rational) | None) => true,
+            (Cmp(CmpOp::Equals), Some(Bool) | None, Some(Bool) | None) => true,
             (Cmp(CmpOp::Equals), _, _) => false,
         }
     }
@@ -111,14 +111,14 @@ impl Binary {
     }
 
     /// Returns the type of the value execution yields.
-    pub fn returns(&self) -> Ty {
+    pub fn returns(&self) -> Option<Ty> {
         use BinaryOp::*;
         match self.op {
             Add => self.lhs.returns(),
             Sub => self.lhs.returns(),
             Mul => self.lhs.returns(),
             Div => self.lhs.returns(),
-            Cmp(CmpOp::Equals) => Ty::Bool,
+            Cmp(CmpOp::Equals) => Some(Ty::Bool),
         }
     }
 

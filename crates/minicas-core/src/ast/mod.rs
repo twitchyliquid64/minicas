@@ -23,9 +23,9 @@ pub enum EvalError {
 
 pub trait AstNode: Clone + Sized + std::fmt::Debug {
     /// Returns the type of the value this node yields.
-    fn returns(&self) -> Ty;
+    fn returns(&self) -> Option<Ty>;
     /// Returns the types of the operands of this node.
-    fn descendant_types(&self) -> impl Iterator<Item = Ty>;
+    fn descendant_types(&self) -> impl Iterator<Item = Option<Ty>>;
     /// Attempts to evaluate the AST to a single finite value.
     fn finite_eval(&self) -> Result<TyValue, EvalError>;
 
@@ -60,10 +60,10 @@ impl Node {
 }
 
 impl AstNode for Node {
-    fn returns(&self) -> Ty {
+    fn returns(&self) -> Option<Ty> {
         self.n.returns()
     }
-    fn descendant_types(&self) -> impl Iterator<Item = Ty> {
+    fn descendant_types(&self) -> impl Iterator<Item = Option<Ty>> {
         self.n.descendant_types()
     }
     fn finite_eval(&self) -> Result<TyValue, EvalError> {
@@ -182,10 +182,10 @@ impl HN {
 }
 
 impl AstNode for HN {
-    fn returns(&self) -> Ty {
+    fn returns(&self) -> Option<Ty> {
         self.0.returns()
     }
-    fn descendant_types(&self) -> impl Iterator<Item = Ty> {
+    fn descendant_types(&self) -> impl Iterator<Item = Option<Ty>> {
         self.0.descendant_types()
     }
     fn finite_eval(&self) -> Result<TyValue, EvalError> {
@@ -301,15 +301,15 @@ impl NodeInner {
 }
 
 impl AstNode for NodeInner {
-    fn returns(&self) -> Ty {
+    fn returns(&self) -> Option<Ty> {
         match self {
-            Self::Const(c) => c.returns(),
+            Self::Const(c) => Some(c.returns()),
             Self::Unary(u) => u.returns(),
             Self::Binary(b) => b.returns(),
         }
     }
 
-    fn descendant_types(&self) -> impl Iterator<Item = Ty> {
+    fn descendant_types(&self) -> impl Iterator<Item = Option<Ty>> {
         match self {
             Self::Const(_) => [None, None].into_iter().flatten(),
             Self::Unary(u) => [Some(u.operand().returns()), None].into_iter().flatten(),
