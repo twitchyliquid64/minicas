@@ -65,6 +65,10 @@ impl Unary {
     pub fn operand(&self) -> &HN {
         return &self.val;
     }
+    /// Returns a mutable reference to the operand.
+    pub fn operand_mut(&mut self) -> &mut HN {
+        return &mut self.val;
+    }
 
     /// Computes a single finite solution, if possible.
     pub fn finite_eval<C: EvalContext>(&self, ctx: &C) -> Result<TyValue, EvalError> {

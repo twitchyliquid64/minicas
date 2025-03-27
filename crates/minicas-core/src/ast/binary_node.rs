@@ -135,6 +135,14 @@ impl Binary {
     pub fn rhs(&self) -> &HN {
         return &self.rhs;
     }
+    /// Returns a mutable reference to the left operand.
+    pub fn lhs_mut(&mut self) -> &mut HN {
+        return &mut self.lhs;
+    }
+    /// Returns a mutable reference to the right operand.
+    pub fn rhs_mut(&mut self) -> &mut HN {
+        return &mut self.rhs;
+    }
 
     /// Computes a single finite solution, if possible.
     pub fn finite_eval<C: EvalContext>(&self, c: &C) -> Result<TyValue, EvalError> {

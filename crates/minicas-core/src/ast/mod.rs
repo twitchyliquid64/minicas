@@ -14,11 +14,14 @@ mod variable_node;
 pub use variable_node::Var;
 
 mod parse;
+
+mod fold;
+pub use fold::fold;
 mod typecheck;
 pub use typecheck::{typecheck, TypeError};
 
 /// Errors that can occur when evaluating an AST.
-#[derive(Debug, Clone, PartialEq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum EvalError {
     DivByZero,
     UnexpectedType(Ty, Ty),
@@ -48,6 +51,10 @@ pub trait AstNode: Clone + Sized + std::fmt::Debug {
     /// The walk will end early if the given function returns false and
     /// the invocation was not depth first.
     fn walk(&self, depth_first: bool, cb: &mut impl FnMut(&NodeInner) -> bool);
+    /// Recursively executes the given function on every node in the AST.
+    /// The walk will end early if the given function returns false and
+    /// the invocation was not depth first.
+    fn walk_mut(&mut self, depth_first: bool, cb: &mut impl FnMut(&mut NodeInner) -> bool);
 
     /// Returns the concrete variant this AST node represents.
     fn as_inner(&self) -> &NodeInner;
@@ -87,6 +94,9 @@ impl AstNode for Node {
     fn walk(&self, depth_first: bool, cb: &mut impl FnMut(&NodeInner) -> bool) {
         self.n.walk(depth_first, cb)
     }
+    fn walk_mut(&mut self, depth_first: bool, cb: &mut impl FnMut(&mut NodeInner) -> bool) {
+        self.n.walk_mut(depth_first, cb)
+    }
     fn as_inner(&self) -> &NodeInner {
         self.n.as_inner()
     }
@@ -95,6 +105,14 @@ impl AstNode for Node {
     }
     fn get<I: Iterator<Item = usize>>(&self, mut i: I) -> Option<&NodeInner> {
         self.n.get(&mut i)
+    }
+}
+
+impl Deref for Node {
+    type Target = NodeInner;
+
+    fn deref(&self) -> &NodeInner {
+        &self.n
     }
 }
 
@@ -218,6 +236,9 @@ impl AstNode for HN {
     }
     fn walk(&self, depth_first: bool, cb: &mut impl FnMut(&NodeInner) -> bool) {
         self.0.walk(depth_first, cb)
+    }
+    fn walk_mut(&mut self, depth_first: bool, cb: &mut impl FnMut(&mut NodeInner) -> bool) {
+        self.0.walk_mut(depth_first, cb)
     }
     fn as_inner(&self) -> &NodeInner {
         self.0.as_inner()
@@ -380,6 +401,33 @@ impl AstNode for NodeInner {
             Self::Binary(b) => {
                 b.lhs().walk(depth_first, cb);
                 b.rhs().walk(depth_first, cb);
+            }
+
+            // nothing contained to walk
+            Self::Const(_) | Self::Var(_) => {}
+        }
+
+        if depth_first {
+            if !cb(self) {
+                return;
+            }
+        }
+    }
+    fn walk_mut(&mut self, depth_first: bool, cb: &mut impl FnMut(&mut NodeInner) -> bool) {
+        if !depth_first {
+            if !cb(self) {
+                return;
+            }
+        }
+
+        // recurse to sub-expressions
+        match self {
+            Self::Unary(u) => {
+                u.operand_mut().walk_mut(depth_first, cb);
+            }
+            Self::Binary(b) => {
+                b.lhs_mut().walk_mut(depth_first, cb);
+                b.rhs_mut().walk_mut(depth_first, cb);
             }
 
             // nothing contained to walk
