@@ -10,6 +10,8 @@ mod binary_node;
 pub use binary_node::{Binary, BinaryOp};
 mod unary_node;
 pub use unary_node::{Unary, UnaryOp};
+mod variable_node;
+pub use variable_node::Var;
 
 mod parse;
 mod typecheck;
@@ -106,6 +108,7 @@ impl<'a> TryFrom<parse::ParseNode<'a>> for Node {
             ParseNode::Float(f) => {
                 Ok(NodeInner::Const((num::rational::Ratio::from_float(f).unwrap()).into()).into())
             }
+            ParseNode::Ident(i) => Ok(NodeInner::Var(Var::new_untyped(i)).into()),
             ParseNode::Unary { op, operand } => {
                 let i = Node::try_from(*operand)?;
                 match op {
@@ -253,6 +256,8 @@ pub enum NodeInner {
     Unary(Unary),
     /// An operation which takes two operands.
     Binary(Binary),
+    /// Some unknown value.
+    Var(Var),
 }
 
 impl NodeInner {
@@ -281,6 +286,13 @@ impl NodeInner {
             _ => None,
         }
     }
+    /// Returns a ref to the inner [Var] if this node is that variant.
+    pub fn as_var(&self) -> Option<&Var> {
+        match self {
+            Self::Var(b) => Some(b),
+            _ => None,
+        }
+    }
 
     /// Returns the nested child described by the given sequence.
     ///
@@ -306,12 +318,13 @@ impl AstNode for NodeInner {
             Self::Const(c) => Some(c.returns()),
             Self::Unary(u) => u.returns(),
             Self::Binary(b) => b.returns(),
+            Self::Var(v) => v.returns(),
         }
     }
 
     fn descendant_types(&self) -> impl Iterator<Item = Option<Ty>> {
         match self {
-            Self::Const(_) => [None, None].into_iter().flatten(),
+            Self::Const(_) | Self::Var(_) => [None, None].into_iter().flatten(),
             Self::Unary(u) => [Some(u.operand().returns()), None].into_iter().flatten(),
             Self::Binary(b) => [Some(b.lhs().returns()), Some(b.lhs().returns())]
                 .into_iter()
@@ -323,6 +336,7 @@ impl AstNode for NodeInner {
             Self::Const(c) => Ok(c.value()),
             Self::Unary(u) => u.finite_eval(),
             Self::Binary(b) => b.finite_eval(),
+            Self::Var(_) => todo!(),
         }
     }
 
@@ -344,7 +358,7 @@ impl AstNode for NodeInner {
             }
 
             // nothing contained to walk
-            Self::Const(_) => {}
+            Self::Const(_) | Self::Var(_) => {}
         }
 
         if depth_first {
@@ -360,7 +374,7 @@ impl AstNode for NodeInner {
 
     fn iter_children(&self) -> impl Iterator<Item = &NodeInner> {
         match self {
-            Self::Const(_) => [None, None].into_iter().flatten(),
+            Self::Const(_) | Self::Var(_) => [None, None].into_iter().flatten(),
             Self::Unary(u) => [Some(&u.operand().0.n), None].into_iter().flatten(),
             Self::Binary(b) => [Some(&b.lhs().0.n), Some(&b.rhs().0.n)]
                 .into_iter()
@@ -388,6 +402,11 @@ impl From<Unary> for NodeInner {
         Self::Unary(n)
     }
 }
+impl From<Var> for NodeInner {
+    fn from(n: Var) -> Self {
+        Self::Var(n)
+    }
+}
 
 impl fmt::Display for NodeInner {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -395,6 +414,7 @@ impl fmt::Display for NodeInner {
             Self::Const(c) => fmt::Display::fmt(c, f),
             Self::Unary(u) => fmt::Display::fmt(u, f),
             Self::Binary(b) => fmt::Display::fmt(b, f),
+            Self::Var(v) => fmt::Display::fmt(v, f),
         }
     }
 }
@@ -443,6 +463,20 @@ mod tests {
                     Binary::sub::<TyValue, HN>(
                         3.into(),
                         Node::new(Unary::negate::<TyValue>(5.into()).into()).into(),
+                    )
+                    .into()
+                )
+            )
+        );
+
+        assert_eq!(
+            "3 - x",
+            format!(
+                "{}",
+                Node::new(
+                    Binary::sub::<TyValue, HN>(
+                        3.into(),
+                        Node::new(Var::new_untyped("x").into()).into(),
                     )
                     .into()
                 )

@@ -1,7 +1,7 @@
 use nom::{
     branch::alt,
     bytes::complete::tag,
-    character::complete::{digit1, multispace0},
+    character::complete::{alpha1, digit1, multispace0},
     combinator::{fail, map_res},
     sequence::{delimited, preceded},
     IResult,
@@ -14,6 +14,7 @@ pub enum ParseNode<'a> {
     Int(i64),
     Float(f64),
     Bool(bool),
+    Ident(String),
     Unary {
         op: &'a str,
         operand: Box<ParseNode<'a>>,
@@ -69,7 +70,10 @@ fn parser(i: &str) -> IResult<&str, ParseNode> {
             map_res(preceded(multispace0, tag("false")), |_| {
                 Ok::<ParseNode<'_>, ()>(ParseNode::Bool(false))
             }),
-            delimited(tag("("), parser, tag(")")),
+            map_res(preceded(multispace0, alpha1), |s: &str| {
+                Ok::<ParseNode<'_>, ()>(ParseNode::Ident(s.into()))
+            }),
+            preceded(multispace0, delimited(tag("("), parser, tag(")"))),
         )),
         |op: Operation<&str, (), &str, ParseNode>| {
             use nom_language::precedence::Operation::*;
@@ -135,6 +139,21 @@ fn parenthesis() {
                         rhs: Box::new(ParseNode::Int(3)),
                     }),
                     rhs: Box::new(ParseNode::Int(2)),
+                }),
+            }
+        ))
+    );
+    assert_eq!(
+        parser("3 + (2 + 3)"),
+        Ok((
+            "",
+            ParseNode::Binary {
+                op: &"+",
+                lhs: Box::new(ParseNode::Int(3)),
+                rhs: Box::new(ParseNode::Binary {
+                    op: &"+",
+                    lhs: Box::new(ParseNode::Int(2)),
+                    rhs: Box::new(ParseNode::Int(3)),
                 }),
             }
         ))

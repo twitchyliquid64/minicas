@@ -13,6 +13,7 @@ pub fn typecheck<N: AstNode>(n: &N) -> Result<(), TypeError> {
     let mut err = Ok(());
     n.walk(false, &mut |n| match n {
         NodeInner::Const(_) => true,
+        NodeInner::Var(_) => true,
 
         NodeInner::Unary(Unary { op, val }) => {
             if !op.descendant_compatible(val.returns()) {
@@ -48,6 +49,7 @@ mod tests {
     #[test]
     fn basic() {
         assert_eq!(typecheck(&Node::try_from("5").unwrap()), Ok(()),);
+        assert_eq!(typecheck(&Node::try_from("x").unwrap()), Ok(()),);
         assert_eq!(typecheck(&Node::try_from("true").unwrap()), Ok(()),);
         assert_eq!(typecheck(&Node::try_from("-5").unwrap()), Ok(()),);
         assert_eq!(typecheck(&Node::try_from("3 + 5 * 11").unwrap()), Ok(()),);
@@ -62,6 +64,16 @@ mod tests {
         );
         assert_eq!(
             typecheck(&Node::try_from("2 * 3 + false").unwrap()),
+            Err(TypeError::BinaryIncompatible(
+                BinaryOp::Add,
+                Some(Ty::Rational),
+                Some(Ty::Bool),
+            )),
+        );
+
+        // A predicate like equals returns a bool, even tho the variable type is not known
+        assert_eq!(
+            typecheck(&Node::try_from("5 + (x == y)").unwrap()),
             Err(TypeError::BinaryIncompatible(
                 BinaryOp::Add,
                 Some(Ty::Rational),
