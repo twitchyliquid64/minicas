@@ -120,6 +120,7 @@ impl<'a> TryFrom<parse::ParseNode<'a>> for Node {
                     "+" => Ok(NodeInner::Binary(Binary::add(l, r)).into()),
                     "*" => Ok(NodeInner::Binary(Binary::mul(l, r)).into()),
                     "/" => Ok(NodeInner::Binary(Binary::div(l, r)).into()),
+                    "==" => Ok(NodeInner::Binary(Binary::equals(l, r)).into()),
                     _ => Err(format!("unknown binary op {}", op)),
                 }
             }
@@ -422,6 +423,12 @@ mod tests {
                     Node::new(Unary::negate::<TyValue>(5.into()).into()).into(),
                 )
                 .into()
+            )),
+        );
+        assert_eq!(
+            Node::try_from("3==5"),
+            Ok(Node::new(
+                Binary::equals::<TyValue, TyValue>(3.into(), 5.into()).into()
             )),
         );
     }

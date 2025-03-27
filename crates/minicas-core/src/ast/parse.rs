@@ -40,6 +40,7 @@ fn parser(i: &str) -> IResult<&str, ParseNode> {
                 binary_op(2, Assoc::Left, tag("/")),
                 binary_op(3, Assoc::Left, tag("+")),
                 binary_op(3, Assoc::Left, tag("-")),
+                binary_op(4, Assoc::Left, tag("==")),
             )),
         ),
         alt((
@@ -221,6 +222,18 @@ fn basic() {
                     rhs: Box::new(ParseNode::Int(3)),
                 }),
                 rhs: Box::new(ParseNode::Int(4)),
+            }
+        ))
+    );
+
+    assert_eq!(
+        parser("4==3"),
+        Ok((
+            "",
+            ParseNode::Binary {
+                op: &"==",
+                lhs: Box::new(ParseNode::Int(4)),
+                rhs: Box::new(ParseNode::Int(3)),
             }
         ))
     );

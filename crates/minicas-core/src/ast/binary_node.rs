@@ -3,6 +3,12 @@ use crate::{Ty, TyValue};
 use num::CheckedDiv;
 use std::fmt;
 
+/// CmpOp enumerations binary operations which compare values.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum CmpOp {
+    Equals,
+}
+
 /// BinaryOp enumerates the types of binary operations.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum BinaryOp {
@@ -14,6 +20,8 @@ pub enum BinaryOp {
     Mul,
     /// Binary Division
     Div,
+    /// Some kind of comparison
+    Cmp(CmpOp),
 }
 
 impl BinaryOp {
@@ -24,6 +32,9 @@ impl BinaryOp {
         match (self, lhs, rhs) {
             (Add | Sub | Mul | Div, Rational, Rational) => true,
             (Add | Sub | Mul | Div, _, _) => false,
+            (Cmp(CmpOp::Equals), Rational, Rational) => true,
+            (Cmp(CmpOp::Equals), Bool, Bool) => true,
+            (Cmp(CmpOp::Equals), _, _) => false,
         }
     }
 }
@@ -36,6 +47,7 @@ impl fmt::Display for BinaryOp {
             Sub => write!(f, "-"),
             Mul => write!(f, "*"),
             Div => write!(f, "/"),
+            Cmp(CmpOp::Equals) => write!(f, "=="),
         }
     }
 }
@@ -89,6 +101,14 @@ impl Binary {
             rhs: rhs.into(),
         }
     }
+    /// Constructs a new equals node.
+    pub fn equals<V1: Into<HN>, V2: Into<HN>>(lhs: V1, rhs: V2) -> Self {
+        Self {
+            op: BinaryOp::Cmp(CmpOp::Equals),
+            lhs: lhs.into(),
+            rhs: rhs.into(),
+        }
+    }
 
     /// Returns the type of the value execution yields.
     pub fn returns(&self) -> Ty {
@@ -98,6 +118,7 @@ impl Binary {
             Sub => self.lhs.returns(),
             Mul => self.lhs.returns(),
             Div => self.lhs.returns(),
+            Cmp(CmpOp::Equals) => Ty::Bool,
         }
     }
 
@@ -138,6 +159,11 @@ impl Binary {
                 },
                 (lv, rv) => Err(EvalError::UnexpectedType(lv.ty(), rv.ty())),
             },
+            Cmp(CmpOp::Equals) => match (self.lhs.finite_eval()?, self.rhs.finite_eval()?) {
+                (TyValue::Rational(l), TyValue::Rational(r)) => Ok(TyValue::Bool(l == r)),
+                (TyValue::Bool(l), TyValue::Bool(r)) => Ok(TyValue::Bool(l == r)),
+                (lv, rv) => Err(EvalError::UnexpectedType(lv.ty(), rv.ty())),
+            },
         }
     }
 }
@@ -147,6 +173,7 @@ impl fmt::Display for Binary {
         use BinaryOp::*;
         match self.op {
             Add | Sub | Mul | Div => write!(f, "{} {} {}", self.lhs, self.op, self.rhs),
+            Cmp(CmpOp::Equals) => write!(f, "{} {} {}", self.lhs, self.op, self.rhs),
         }
     }
 }
@@ -185,6 +212,17 @@ mod tests {
         assert_eq!(
             Binary::div::<TyValue, TyValue>(4usize.into(), 0usize.into()).finite_eval(),
             Err(EvalError::DivByZero)
+        );
+    }
+    #[test]
+    fn eq_finite_eval() {
+        assert_eq!(
+            Binary::equals::<TyValue, TyValue>(2usize.into(), 3usize.into()).finite_eval(),
+            Ok(false.into())
+        );
+        assert_eq!(
+            Binary::equals::<TyValue, TyValue>(2usize.into(), 2usize.into()).finite_eval(),
+            Ok(true.into())
         );
     }
 }
