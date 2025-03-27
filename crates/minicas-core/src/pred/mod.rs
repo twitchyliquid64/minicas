@@ -1,5 +1,6 @@
 //! Predicate rules/matching for AST nodes.
 use crate::ast::{AstNode, BinaryOp, NodeInner, UnaryOp};
+use crate::TyValue;
 
 /// Describes a predicate on the operation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -7,6 +8,7 @@ pub enum PredicateOp {
     Unary(UnaryOp),
     Binary(BinaryOp),
     Const,
+    Var,
 }
 
 impl PredicateOp {
@@ -16,6 +18,7 @@ impl PredicateOp {
             (Self::Unary(po), NodeInner::Unary(n)) => po.eq(&n.op),
             (Self::Binary(po), NodeInner::Binary(n)) => po.eq(&n.op),
             (Self::Const, NodeInner::Const(_)) => true,
+            (Self::Var, NodeInner::Var(_)) => true,
             _ => false,
         }
     }
@@ -26,6 +29,11 @@ impl PredicateOp {
 pub struct Predicate {
     /// Match only on nodes performing the given operation.
     pub op: Option<PredicateOp>,
+    /// Match only on nodes which are NOT the given operation.
+    pub not_op: Option<PredicateOp>,
+
+    /// Match if the node is a constant with some value.
+    pub const_value: Option<TyValue>,
 
     /// Match only on nodes whos children match the given predicates respectively.
     ///
@@ -59,6 +67,21 @@ impl Predicate {
         if !self.op.map(|po| po.matches(n)).unwrap_or(true) {
             return false;
         }
+        if self.not_op.map(|po| po.matches(n)).unwrap_or(false) {
+            return false;
+        }
+        match (self.const_value.as_ref(), n.as_inner()) {
+            (None, _) => {}
+            (Some(v), NodeInner::Const(c)) => {
+                if c.value() != v {
+                    return false;
+                }
+            }
+            (Some(_), _) => {
+                return false;
+            }
+        }
+
         if self.children.len() > 0 {
             if !self.children.iter().zip(n.iter_children()).all(|(pc, c)| {
                 if let Some(pc) = pc {
@@ -219,6 +242,62 @@ mod tests {
                 ..Default::default()
             }
             .matches(&Node::try_from("-4 + 2 * 3").unwrap()),
+            false,
+        );
+    }
+
+    #[test]
+    fn not_op() {
+        assert_eq!(
+            Predicate {
+                not_op: Some(PredicateOp::Binary(BinaryOp::Mul)),
+                ..Default::default()
+            }
+            .matches(&Node::try_from("3 + 5").unwrap()),
+            true,
+        );
+        assert_eq!(
+            Predicate {
+                not_op: Some(PredicateOp::Var),
+                ..Default::default()
+            }
+            .matches(&Node::try_from("x").unwrap()),
+            false,
+        );
+    }
+
+    #[test]
+    fn const_value() {
+        assert_eq!(
+            Predicate {
+                const_value: Some(TyValue::Bool(true)),
+                ..Default::default()
+            }
+            .matches(&Node::try_from("3").unwrap()),
+            false,
+        );
+        assert_eq!(
+            Predicate {
+                const_value: Some(TyValue::from(3.5)),
+                ..Default::default()
+            }
+            .matches(&Node::try_from("3.5 + 2").unwrap()),
+            false,
+        );
+        assert_eq!(
+            Predicate {
+                const_value: Some(TyValue::from(3)),
+                ..Default::default()
+            }
+            .matches(&Node::try_from("3").unwrap()),
+            true,
+        );
+        assert_eq!(
+            Predicate {
+                const_value: Some(TyValue::from(4)),
+                ..Default::default()
+            }
+            .matches(&Node::try_from("3").unwrap()),
             false,
         );
     }

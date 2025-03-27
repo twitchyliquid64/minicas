@@ -17,8 +17,8 @@ impl Const {
     }
 
     /// Returns the constant value.
-    pub fn value(&self) -> TyValue {
-        return self.0.clone();
+    pub fn value(&self) -> &TyValue {
+        &self.0
     }
 }
 

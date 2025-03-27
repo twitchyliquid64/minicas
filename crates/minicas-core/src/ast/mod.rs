@@ -7,7 +7,7 @@ use crate::ty::{Ty, TyValue};
 mod const_node;
 pub use const_node::Const;
 mod binary_node;
-pub use binary_node::{Binary, BinaryOp};
+pub use binary_node::{Binary, BinaryOp, CmpOp};
 mod unary_node;
 pub use unary_node::{Unary, UnaryOp};
 mod variable_node;
@@ -70,6 +70,8 @@ pub trait AstNode: Clone + Sized + std::fmt::Debug {
 }
 
 /// High-level type representing any node.
+///
+/// Wraps a [NodeInner].
 #[derive(Debug, Clone, PartialEq, Hash)]
 pub struct Node {
     n: NodeInner,
@@ -182,7 +184,7 @@ impl<'a> TryFrom<&'a str> for Node {
     }
 }
 
-/// High-level type representing a node on the heap.
+/// A [Node] on the heap.
 #[derive(Debug, Clone, PartialEq, Hash)]
 pub struct HN(Box<Node>);
 
@@ -290,7 +292,7 @@ impl fmt::Display for HN {
     }
 }
 
-/// NodeInner enumerates the varieties of node.
+/// Concrete varieties of a node which together compose an AST.
 #[derive(Debug, Clone, PartialEq, Hash)]
 pub enum NodeInner {
     /// Some constant value, like a coefficient or offset.
@@ -304,6 +306,7 @@ pub enum NodeInner {
 }
 
 impl NodeInner {
+    /// Creates a new constant node with the given value.
     pub fn new_const<V: Into<TyValue>>(v: V) -> Self {
         Self::Const(Const::new(v.into()))
     }
@@ -376,7 +379,7 @@ impl AstNode for NodeInner {
     }
     fn finite_eval<C: EvalContext>(&self, ctx: &C) -> Result<TyValue, EvalError> {
         match self {
-            Self::Const(c) => Ok(c.value()),
+            Self::Const(c) => Ok(c.value().clone()),
             Self::Unary(u) => u.finite_eval(ctx),
             Self::Binary(b) => b.finite_eval(ctx),
             Self::Var(v) => match ctx.resolve_var(v.ident()) {

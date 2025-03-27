@@ -1,5 +1,4 @@
 use crate::ast::{AstNode, Binary, EvalError, NodeInner, Unary};
-use crate::Ty;
 
 /// Performs constant folding on an AST.
 pub fn fold<N: AstNode>(n: &mut N) -> Result<(), EvalError> {
