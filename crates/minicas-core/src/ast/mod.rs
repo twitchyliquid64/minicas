@@ -108,7 +108,16 @@ impl<'a> TryFrom<parse::ParseNode<'a>> for Node {
             ParseNode::Float(f) => {
                 Ok(NodeInner::Const((num::rational::Ratio::from_float(f).unwrap()).into()).into())
             }
+
             ParseNode::Ident(i) => Ok(NodeInner::Var(Var::new_untyped(i)).into()),
+            // TODO: Should probably somehow represent that this is a coefficient, and hence
+            // can only be a numeric quantity (vs say a boolean)
+            ParseNode::IdentWithCoefficient(co_eff, i) => Ok(NodeInner::Binary(Binary::mul(
+                NodeInner::Const(co_eff.into()),
+                NodeInner::Var(Var::new_untyped(i)),
+            ))
+            .into()),
+
             ParseNode::Unary { op, operand } => {
                 let i = Node::try_from(*operand)?;
                 match op {
@@ -449,6 +458,16 @@ mod tests {
             Node::try_from("3==5"),
             Ok(Node::new(
                 Binary::equals::<TyValue, TyValue>(3.into(), 5.into()).into()
+            )),
+        );
+        assert_eq!(
+            Node::try_from("5x"),
+            Ok(Node::new(
+                Binary::mul::<TyValue, HN>(
+                    5.into(),
+                    Node::new(Var::new_untyped("x").into()).into()
+                )
+                .into()
             )),
         );
     }

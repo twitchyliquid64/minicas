@@ -15,6 +15,7 @@ pub enum ParseNode<'a> {
     Float(f64),
     Bool(bool),
     Ident(String),
+    IdentWithCoefficient(u64, String),
     Unary {
         op: &'a str,
         operand: Box<ParseNode<'a>>,
@@ -54,6 +55,15 @@ fn parser(i: &str) -> IResult<&str, ParseNode> {
 
                     if let Ok(f) = s.parse::<f64>() {
                         return Ok(ParseNode::Float(f));
+                    }
+                    Err(())
+                },
+            ),
+            map_res(
+                preceded(multispace0, (digit1, alpha1)),
+                |(co_eff, ident): (&str, &str)| {
+                    if let Ok(co_eff) = co_eff.parse::<u64>() {
+                        return Ok(ParseNode::IdentWithCoefficient(co_eff, ident.into()));
                     }
                     Err(())
                 },
@@ -99,6 +109,16 @@ fn literals() {
     assert_eq!(parser("2.5"), Ok(("", ParseNode::Float(2.5))));
     assert_eq!(parser("true"), Ok(("", ParseNode::Bool(true))));
     assert_eq!(parser("false "), Ok((" ", ParseNode::Bool(false))));
+}
+
+#[test]
+fn vars() {
+    assert_eq!(parser("x"), Ok(("", ParseNode::Ident("x".into()))));
+    assert_eq!(parser("ab"), Ok(("", ParseNode::Ident("ab".into()))));
+    assert_eq!(
+        parser("2x"),
+        Ok(("", ParseNode::IdentWithCoefficient(2, "x".into())))
+    );
 }
 
 #[test]
