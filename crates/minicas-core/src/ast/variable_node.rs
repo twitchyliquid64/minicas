@@ -29,6 +29,11 @@ impl Var {
     pub fn returns(&self) -> Option<Ty> {
         self.ty
     }
+
+    /// Returns the identifier this variable is referenced by.
+    pub fn ident(&self) -> &str {
+        self.id.as_str()
+    }
 }
 
 impl fmt::Display for Var {

@@ -1,4 +1,4 @@
-use crate::ast::{AstNode, EvalError, HN};
+use crate::ast::{AstNode, EvalContext, EvalError, HN};
 use crate::{Ty, TyValue};
 use std::fmt;
 
@@ -67,10 +67,10 @@ impl Unary {
     }
 
     /// Computes a single finite solution, if possible.
-    pub fn finite_eval(&self) -> Result<TyValue, EvalError> {
+    pub fn finite_eval<C: EvalContext>(&self, ctx: &C) -> Result<TyValue, EvalError> {
         use UnaryOp::*;
         match self.op {
-            Negate => match self.val.finite_eval()? {
+            Negate => match self.val.finite_eval(ctx)? {
                 TyValue::Rational(r) => Ok(TyValue::Rational(-r)),
                 TyValue::Bool(b) => Ok(TyValue::Bool(!b)),
             },
@@ -94,11 +94,11 @@ mod tests {
     #[test]
     fn negate_finite_eval() {
         assert_eq!(
-            Unary::negate(TyValue::Bool(true)).finite_eval(),
+            Unary::negate(TyValue::Bool(true)).finite_eval(&()),
             Ok(TyValue::Bool(false))
         );
         assert_eq!(
-            Unary::negate::<TyValue>(2usize.into()).finite_eval(),
+            Unary::negate::<TyValue>(2usize.into()).finite_eval(&()),
             Ok((-2isize).into())
         );
     }

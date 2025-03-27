@@ -1,4 +1,4 @@
-use crate::ast::{AstNode, EvalError, HN};
+use crate::ast::{AstNode, EvalContext, EvalError, HN};
 use crate::{Ty, TyValue};
 use num::CheckedDiv;
 use std::fmt;
@@ -137,29 +137,29 @@ impl Binary {
     }
 
     /// Computes a single finite solution, if possible.
-    pub fn finite_eval(&self) -> Result<TyValue, EvalError> {
+    pub fn finite_eval<C: EvalContext>(&self, c: &C) -> Result<TyValue, EvalError> {
         use BinaryOp::*;
         match self.op {
-            Add => match (self.lhs.finite_eval()?, self.rhs.finite_eval()?) {
+            Add => match (self.lhs.finite_eval(c)?, self.rhs.finite_eval(c)?) {
                 (TyValue::Rational(l), TyValue::Rational(r)) => Ok(TyValue::Rational(l + r)),
                 (lv, rv) => Err(EvalError::UnexpectedType(lv.ty(), rv.ty())),
             },
-            Sub => match (self.lhs.finite_eval()?, self.rhs.finite_eval()?) {
+            Sub => match (self.lhs.finite_eval(c)?, self.rhs.finite_eval(c)?) {
                 (TyValue::Rational(l), TyValue::Rational(r)) => Ok(TyValue::Rational(l - r)),
                 (lv, rv) => Err(EvalError::UnexpectedType(lv.ty(), rv.ty())),
             },
-            Mul => match (self.lhs.finite_eval()?, self.rhs.finite_eval()?) {
+            Mul => match (self.lhs.finite_eval(c)?, self.rhs.finite_eval(c)?) {
                 (TyValue::Rational(l), TyValue::Rational(r)) => Ok(TyValue::Rational(l * r)),
                 (lv, rv) => Err(EvalError::UnexpectedType(lv.ty(), rv.ty())),
             },
-            Div => match (self.lhs.finite_eval()?, self.rhs.finite_eval()?) {
+            Div => match (self.lhs.finite_eval(c)?, self.rhs.finite_eval(c)?) {
                 (TyValue::Rational(l), TyValue::Rational(r)) => match l.checked_div(&r) {
                     Some(o) => Ok(TyValue::Rational(o)),
                     None => Err(EvalError::DivByZero),
                 },
                 (lv, rv) => Err(EvalError::UnexpectedType(lv.ty(), rv.ty())),
             },
-            Cmp(CmpOp::Equals) => match (self.lhs.finite_eval()?, self.rhs.finite_eval()?) {
+            Cmp(CmpOp::Equals) => match (self.lhs.finite_eval(c)?, self.rhs.finite_eval(c)?) {
                 (TyValue::Rational(l), TyValue::Rational(r)) => Ok(TyValue::Bool(l == r)),
                 (TyValue::Bool(l), TyValue::Bool(r)) => Ok(TyValue::Bool(l == r)),
                 (lv, rv) => Err(EvalError::UnexpectedType(lv.ty(), rv.ty())),
@@ -185,43 +185,43 @@ mod tests {
     #[test]
     fn add_finite_eval() {
         assert_eq!(
-            Binary::add::<TyValue, TyValue>(2usize.into(), 3usize.into()).finite_eval(),
+            Binary::add::<TyValue, TyValue>(2usize.into(), 3usize.into()).finite_eval(&()),
             Ok((5usize).into())
         );
     }
     #[test]
     fn sub_finite_eval() {
         assert_eq!(
-            Binary::sub::<TyValue, TyValue>(2usize.into(), 3usize.into()).finite_eval(),
+            Binary::sub::<TyValue, TyValue>(2usize.into(), 3usize.into()).finite_eval(&()),
             Ok((-1isize).into())
         );
     }
     #[test]
     fn mul_finite_eval() {
         assert_eq!(
-            Binary::mul::<TyValue, TyValue>(2usize.into(), 3usize.into()).finite_eval(),
+            Binary::mul::<TyValue, TyValue>(2usize.into(), 3usize.into()).finite_eval(&()),
             Ok((6usize).into())
         );
     }
     #[test]
     fn div_finite_eval() {
         assert_eq!(
-            Binary::div::<TyValue, TyValue>(4usize.into(), 2usize.into()).finite_eval(),
+            Binary::div::<TyValue, TyValue>(4usize.into(), 2usize.into()).finite_eval(&()),
             Ok((2usize).into())
         );
         assert_eq!(
-            Binary::div::<TyValue, TyValue>(4usize.into(), 0usize.into()).finite_eval(),
+            Binary::div::<TyValue, TyValue>(4usize.into(), 0usize.into()).finite_eval(&()),
             Err(EvalError::DivByZero)
         );
     }
     #[test]
     fn eq_finite_eval() {
         assert_eq!(
-            Binary::equals::<TyValue, TyValue>(2usize.into(), 3usize.into()).finite_eval(),
+            Binary::equals::<TyValue, TyValue>(2usize.into(), 3usize.into()).finite_eval(&()),
             Ok(false.into())
         );
         assert_eq!(
-            Binary::equals::<TyValue, TyValue>(2usize.into(), 2usize.into()).finite_eval(),
+            Binary::equals::<TyValue, TyValue>(2usize.into(), 2usize.into()).finite_eval(&()),
             Ok(true.into())
         );
     }

@@ -17,10 +17,23 @@ mod parse;
 mod typecheck;
 pub use typecheck::{typecheck, TypeError};
 
+/// Errors that can occur when evaluating an AST.
 #[derive(Debug, Clone, PartialEq, Hash)]
 pub enum EvalError {
     DivByZero,
     UnexpectedType(Ty, Ty),
+    UnknownIdent(String),
+}
+
+/// Context that needs to be provided for evaluation.
+pub trait EvalContext {
+    fn resolve_var(&self, id: &str) -> Option<&TyValue>;
+}
+
+impl EvalContext for () {
+    fn resolve_var(&self, _id: &str) -> Option<&TyValue> {
+        None
+    }
 }
 
 pub trait AstNode: Clone + Sized + std::fmt::Debug {
@@ -29,7 +42,7 @@ pub trait AstNode: Clone + Sized + std::fmt::Debug {
     /// Returns the types of the operands of this node.
     fn descendant_types(&self) -> impl Iterator<Item = Option<Ty>>;
     /// Attempts to evaluate the AST to a single finite value.
-    fn finite_eval(&self) -> Result<TyValue, EvalError>;
+    fn finite_eval<C: EvalContext>(&self, ctx: &C) -> Result<TyValue, EvalError>;
 
     /// Recursively executes the given function on every node in the AST.
     /// The walk will end early if the given function returns false and
@@ -68,8 +81,8 @@ impl AstNode for Node {
     fn descendant_types(&self) -> impl Iterator<Item = Option<Ty>> {
         self.n.descendant_types()
     }
-    fn finite_eval(&self) -> Result<TyValue, EvalError> {
-        self.n.finite_eval()
+    fn finite_eval<C: EvalContext>(&self, ctx: &C) -> Result<TyValue, EvalError> {
+        self.n.finite_eval(ctx)
     }
     fn walk(&self, depth_first: bool, cb: &mut impl FnMut(&NodeInner) -> bool) {
         self.n.walk(depth_first, cb)
@@ -200,8 +213,8 @@ impl AstNode for HN {
     fn descendant_types(&self) -> impl Iterator<Item = Option<Ty>> {
         self.0.descendant_types()
     }
-    fn finite_eval(&self) -> Result<TyValue, EvalError> {
-        self.0.finite_eval()
+    fn finite_eval<C: EvalContext>(&self, ctx: &C) -> Result<TyValue, EvalError> {
+        self.0.finite_eval(ctx)
     }
     fn walk(&self, depth_first: bool, cb: &mut impl FnMut(&NodeInner) -> bool) {
         self.0.walk(depth_first, cb)
@@ -340,12 +353,15 @@ impl AstNode for NodeInner {
                 .flatten(),
         }
     }
-    fn finite_eval(&self) -> Result<TyValue, EvalError> {
+    fn finite_eval<C: EvalContext>(&self, ctx: &C) -> Result<TyValue, EvalError> {
         match self {
             Self::Const(c) => Ok(c.value()),
-            Self::Unary(u) => u.finite_eval(),
-            Self::Binary(b) => b.finite_eval(),
-            Self::Var(_) => todo!(),
+            Self::Unary(u) => u.finite_eval(ctx),
+            Self::Binary(b) => b.finite_eval(ctx),
+            Self::Var(v) => match ctx.resolve_var(v.ident()) {
+                Some(v) => Ok(v.clone()),
+                None => Err(EvalError::UnknownIdent(v.ident().to_string())),
+            },
         }
     }
 
@@ -506,16 +522,21 @@ mod tests {
     #[test]
     fn finite_eval_simple() {
         assert_eq!(
-            Node::try_from("3.5 + 4.5").unwrap().finite_eval(),
+            Node::try_from("3.5 + 4.5").unwrap().finite_eval(&()),
             Ok(8.into()),
         );
         assert_eq!(
-            Node::try_from("3 - 5").unwrap().finite_eval(),
+            Node::try_from("3 - 5").unwrap().finite_eval(&()),
             Ok((-2).into()),
         );
         assert_eq!(
-            Node::try_from("9 - 3 * 2").unwrap().finite_eval(),
+            Node::try_from("9 - 3 * 2").unwrap().finite_eval(&()),
             Ok(3.into()),
+        );
+
+        assert_eq!(
+            Node::try_from("x").unwrap().finite_eval(&()),
+            Err(EvalError::UnknownIdent("x".to_string()))
         );
     }
 
