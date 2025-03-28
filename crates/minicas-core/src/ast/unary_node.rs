@@ -33,7 +33,7 @@ impl fmt::Display for UnaryOp {
 }
 
 /// AST object representing an operation over a single operand.
-#[derive(Debug, Clone, PartialEq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Unary {
     pub op: UnaryOp,
     pub val: HN,

@@ -71,7 +71,7 @@ impl fmt::Display for BinaryOp {
 }
 
 /// AST object representing an operation over two operands.
-#[derive(Debug, Clone, PartialEq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Binary {
     pub op: BinaryOp,
     pub lhs: HN,

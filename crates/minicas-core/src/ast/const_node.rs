@@ -2,7 +2,7 @@ use crate::{Ty, TyValue};
 use std::fmt;
 
 /// AST object representing some constant value.
-#[derive(Debug, Clone, PartialEq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Const(pub(crate) TyValue);
 
 impl Const {

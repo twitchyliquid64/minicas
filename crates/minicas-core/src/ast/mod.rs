@@ -67,12 +67,18 @@ pub trait AstNode: Clone + Sized + std::fmt::Debug {
     /// the referenced node. A value of 0 means the left-hand side or unary
     /// operand, and a value of 1 means the right-hand side operand.
     fn get<I: Iterator<Item = usize>>(&self, i: I) -> Option<&NodeInner>;
+    /// Returns the mutable [NodeInner] described by the given path sequence.
+    ///
+    /// Each entry describes where to branch when recursively fetching
+    /// the referenced node. A value of 0 means the left-hand side or unary
+    /// operand, and a value of 1 means the right-hand side operand.
+    fn get_mut<I: Iterator<Item = usize>>(&mut self, i: I) -> Option<&mut NodeInner>;
 }
 
 /// High-level type representing any node.
 ///
 /// Wraps a [NodeInner].
-#[derive(Debug, Clone, PartialEq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Node {
     n: NodeInner,
 }
@@ -107,6 +113,9 @@ impl AstNode for Node {
     }
     fn get<I: Iterator<Item = usize>>(&self, mut i: I) -> Option<&NodeInner> {
         self.n.get(&mut i)
+    }
+    fn get_mut<I: Iterator<Item = usize>>(&mut self, mut i: I) -> Option<&mut NodeInner> {
+        self.n.get_mut(&mut i)
     }
 }
 
@@ -189,7 +198,7 @@ impl<'a> TryFrom<&'a str> for Node {
 }
 
 /// A [Node] on the heap.
-#[derive(Debug, Clone, PartialEq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct HN(Box<Node>);
 
 impl HN {
@@ -255,6 +264,9 @@ impl AstNode for HN {
     fn get<I: Iterator<Item = usize>>(&self, i: I) -> Option<&NodeInner> {
         self.0.get(i)
     }
+    fn get_mut<I: Iterator<Item = usize>>(&mut self, i: I) -> Option<&mut NodeInner> {
+        self.0.get_mut(i)
+    }
 }
 
 impl Deref for HN {
@@ -297,7 +309,7 @@ impl fmt::Display for HN {
 }
 
 /// Concrete varieties of a node which together compose an AST.
-#[derive(Debug, Clone, PartialEq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum NodeInner {
     /// Some constant value, like a coefficient or offset.
     Const(Const),
@@ -355,6 +367,23 @@ impl NodeInner {
                 (Self::Unary(u), 0) => (*u.operand()).n.get(i),
                 (Self::Binary(b), 0) => (*b.lhs()).n.get(i),
                 (Self::Binary(b), 1) => (*b.rhs()).n.get(i),
+                _ => None,
+            },
+            None => Some(self),
+        }
+    }
+
+    /// Returns the mutable [NodeInner] described by the given path sequence.
+    ///
+    /// Each entry describes where to branch when recursively fetching
+    /// the referenced node. A value of 0 means the left-hand side or unary
+    /// operand, and a value of 1 means the right-hand side operand.
+    fn get_mut<I: Iterator<Item = usize>>(&mut self, i: &mut I) -> Option<&mut NodeInner> {
+        match i.next() {
+            Some(idx) => match (self, idx) {
+                (Self::Unary(u), 0) => (*u.operand_mut()).n.get_mut(i),
+                (Self::Binary(b), 0) => (*b.lhs_mut()).n.get_mut(i),
+                (Self::Binary(b), 1) => (*b.rhs_mut()).n.get_mut(i),
                 _ => None,
             },
             None => Some(self),
@@ -464,6 +493,9 @@ impl AstNode for NodeInner {
 
     fn get<I: Iterator<Item = usize>>(&self, mut i: I) -> Option<&NodeInner> {
         NodeInner::get(self, &mut i)
+    }
+    fn get_mut<I: Iterator<Item = usize>>(&mut self, mut i: I) -> Option<&mut NodeInner> {
+        NodeInner::get_mut(self, &mut i)
     }
 }
 

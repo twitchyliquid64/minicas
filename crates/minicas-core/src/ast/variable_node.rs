@@ -2,7 +2,7 @@ use crate::Ty;
 use std::fmt;
 
 /// AST object representing some unknown value.
-#[derive(Debug, Clone, PartialEq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Var {
     pub id: String,
     pub ty: Option<Ty>,

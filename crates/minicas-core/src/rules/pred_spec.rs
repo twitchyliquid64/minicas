@@ -4,7 +4,7 @@ use serde::Deserialize;
 use std::convert::TryInto;
 
 /// Describes how a predicate is specified in a rule file.
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Deserialize, Default, Debug, Clone, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct PredSpec {
     pub op: Option<String>,
