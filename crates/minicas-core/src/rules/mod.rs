@@ -37,6 +37,8 @@ pub enum RuleActionSpec {
         /// See [AstNode::get] for more details on indexing.
         to: Vec<usize>,
     },
+    /// Perform multiple actions in order.
+    Multi(Vec<Self>),
 }
 
 impl RuleActionSpec {
@@ -48,6 +50,11 @@ impl RuleActionSpec {
                 let from = n.get(from.iter().map(|i| *i)).ok_or(())?.clone();
                 let to = n.get_mut(to.iter().map(|i| *i)).ok_or(())?;
                 *to = from;
+            }
+            Self::Multi(v) => {
+                for r in v.iter() {
+                    r.apply(n)?;
+                }
             }
         }
         Ok(())
@@ -61,7 +68,7 @@ pub struct RuleSpec {
     #[serde(alias = "match")]
     pub predicate: PredSpec,
 
-    #[serde(alias = "replace")]
+    #[serde(alias = "replace", alias = "actions")]
     pub action: RuleActionSpec,
 
     #[serde(default)]
@@ -242,8 +249,9 @@ mod tests {
             match.op = '/'
 			match.rhs = {const = '1'}
 
-			replace.from = [0] # using the numerator (first lhs)
-			replace.to = []    # overwrite self
+			actions = [
+                {from = [0], to = []},
+            ]
 
 			tests = [
 			    {from = '12 / 1', to = '12'},
