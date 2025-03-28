@@ -1,4 +1,4 @@
-use crate::ast::{AstNode, Node};
+use crate::ast::{AstNode, Node, NodeInner};
 use crate::pred::Predicate;
 use serde::Deserialize;
 
@@ -37,6 +37,8 @@ pub enum RuleActionSpec {
         /// See [AstNode::get] for more details on indexing.
         to: Vec<usize>,
     },
+    /// Swaps two nodes in the AST.
+    Swap { swap: (Vec<usize>, Vec<usize>) },
     /// Perform multiple actions in order.
     Multi(Vec<Self>),
 }
@@ -50,6 +52,17 @@ impl RuleActionSpec {
                 let from = n.get(from.iter().map(|i| *i)).ok_or(())?.clone();
                 let to = n.get_mut(to.iter().map(|i| *i)).ok_or(())?;
                 *to = from;
+            }
+            Self::Swap { swap: (a, b) } => {
+                let mut tmp = NodeInner::new_const(false);
+                let a_mut = n.get_mut(a.iter().map(|i| *i)).ok_or(())?;
+                std::mem::swap(&mut tmp, a_mut);
+
+                let b_mut = n.get_mut(b.iter().map(|i| *i)).ok_or(())?;
+                std::mem::swap(&mut tmp, b_mut);
+
+                let a_mut = n.get_mut(a.iter().map(|i| *i)).ok_or(())?;
+                std::mem::swap(&mut tmp, a_mut);
             }
             Self::Multi(v) => {
                 for r in v.iter() {
@@ -68,7 +81,7 @@ pub struct RuleSpec {
     #[serde(alias = "match")]
     pub predicate: PredSpec,
 
-    #[serde(alias = "replace", alias = "actions")]
+    #[serde(alias = "replace", alias = "actions", alias = "swap")]
     pub action: RuleActionSpec,
 
     #[serde(default)]
@@ -240,6 +253,26 @@ mod tests {
         let mut ast = Node::try_from("12 / 1").unwrap();
         assert_eq!(rule.eval(&mut ast), Ok(true));
         assert_eq!(ast, Node::try_from("12").unwrap());
+    }
+
+    #[test]
+    fn apply_swap() {
+        let rule: Rule = de::from_str::<RuleSpec>(
+            r#"
+            match.op = '*'
+            match.lhs = {not_op = 'const'}
+            match.rhs = {op = 'const'}
+
+            action.swap = [[0], [1]]
+            "#,
+        )
+        .unwrap()
+        .try_into()
+        .unwrap();
+
+        let mut ast = Node::try_from("x * 2").unwrap();
+        assert_eq!(rule.eval(&mut ast), Ok(true));
+        assert_eq!(ast, Node::try_from("2x").unwrap());
     }
 
     #[test]
