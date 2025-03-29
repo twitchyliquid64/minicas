@@ -15,6 +15,8 @@ pub use variable_node::Var;
 
 mod parse;
 
+mod ac_collect;
+pub use ac_collect::{ac_collect, AcError};
 mod fold;
 pub use fold::fold;
 mod typecheck;
