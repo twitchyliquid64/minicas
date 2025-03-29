@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/minicas-core"]
+members = ["crates/minicas"]
 resolver = "2"
 
 [workspace.dependencies]

@@ -1,6 +1,6 @@
 [package]
 edition = "2021"
-name = "minicas-core"
+name = "minicas"
 version = "0.0.1"
 license = "MIT OR Apache-2.0"
 
