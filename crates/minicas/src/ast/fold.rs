@@ -59,6 +59,13 @@ mod tests {
     }
 
     #[test]
+    fn binary_bool() {
+        let mut n = Node::try_from("true == false").unwrap();
+        assert_eq!(fold(&mut n), Ok(()),);
+        assert_eq!(n, Node::try_from("false").unwrap());
+    }
+
+    #[test]
     fn chained() {
         let mut n = Node::try_from("2 + (3 * --2)").unwrap();
         assert_eq!(fold(&mut n), Ok(()),);

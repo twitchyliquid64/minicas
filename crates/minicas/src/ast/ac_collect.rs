@@ -1,4 +1,4 @@
-use crate::ast::{BinaryOp, NodeInner};
+use crate::ast::{BinaryOp, NodeInner, Path};
 
 /// Describes issues with collecting terms.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -11,8 +11,8 @@ pub enum AcError {
 fn ac_collect_recursive(
     n: &NodeInner,
     op: BinaryOp,
-    path: Vec<usize>,
-    terms: &mut Vec<Vec<usize>>,
+    path: Path,
+    terms: &mut Vec<Path>,
 ) -> Result<(), ()> {
     match n {
         NodeInner::Binary(b) => {
@@ -40,14 +40,14 @@ fn ac_collect_recursive(
 
 /// Collects paths to all terms below this node which share the same
 /// associative + commutative operator.
-pub fn ac_collect(n: &NodeInner, terms: &mut Vec<Vec<usize>>) -> Result<(), AcError> {
+pub fn ac_collect(n: &NodeInner, terms: &mut Vec<Path>) -> Result<(), AcError> {
     if let Some(b) = n.as_binary() {
         let op = b.op();
         if !op.associative() || !op.commutative() {
             return Err(AcError::NotAssociativeCommutative);
         }
 
-        ac_collect_recursive(n, op, Vec::with_capacity(5), terms).map_err(|_| AcError::Internal)
+        ac_collect_recursive(n, op, Path::default(), terms).map_err(|_| AcError::Internal)
     } else {
         Err(AcError::BadVariant)
     }
@@ -63,7 +63,13 @@ mod tests {
         let n = Node::try_from("5 + 3").unwrap();
         let mut output = Vec::new();
         assert_eq!(ac_collect(&n, &mut output), Ok(()));
-        assert_eq!(output, vec![vec![0], vec![1]]);
+        assert_eq!(
+            output
+                .into_iter()
+                .map(|p| p.into())
+                .collect::<Vec<Vec<usize>>>(),
+            vec![vec![0], vec![1]]
+        );
     }
 
     #[test]
@@ -71,7 +77,13 @@ mod tests {
         let n = Node::try_from("5 + 3 + 2x").unwrap();
         let mut output = Vec::new();
         assert_eq!(ac_collect(&n, &mut output), Ok(()));
-        assert_eq!(output, vec![vec![0, 0], vec![0, 1], vec![1]]);
+        assert_eq!(
+            output
+                .into_iter()
+                .map(|p| p.into())
+                .collect::<Vec<Vec<usize>>>(),
+            vec![vec![0, 0], vec![0, 1], vec![1]]
+        );
     }
 
     #[test]
@@ -82,7 +94,7 @@ mod tests {
         assert_eq!(
             output
                 .into_iter()
-                .map(|p| format!("{}", n.get(&mut p.into_iter()).unwrap()))
+                .map(|p| format!("{}", n.get(&mut p.iter()).unwrap()))
                 .collect::<Vec<_>>(),
             vec!["2 + 1", "5", "3",],
         );
