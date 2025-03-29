@@ -1,0 +1,33 @@
+[mul-coefficients-on-lhs]
+match.op = '*'
+match.lhs = {not_op = 'const'}
+match.rhs = {op = 'const'}
+
+action.swap = [[0], [1]]
+
+tests = [
+	{from = 'x * 4', to = '4x'},
+	{from = '3x * 2', to = '2 * 3x'},
+]
+
+[elim-div-by-1]
+match.op = '/'
+match.rhs = {const = '1'}
+
+replace.from = [0] # using the numerator (first lhs)
+replace.to = []    # overwrite self
+
+tests = [
+	{from = '12 / 1', to = '12'},
+]
+
+[elim-mul-by-1]
+match.op = '*'
+match.lhs = {const = '1'}
+
+replace.from = [1]
+replace.to = []
+
+tests = [
+	{from = '1 * 12', to = '12'},
+]
