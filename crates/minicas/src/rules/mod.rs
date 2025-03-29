@@ -1,6 +1,6 @@
 use crate::ast::{AstNode, Node, NodeInner};
 use crate::pred::Predicate;
-use serde::Deserialize;
+use serde::{Deserialize, Deserializer};
 
 mod pred_spec;
 pub use pred_spec::PredSpec;
@@ -22,6 +22,15 @@ impl TryFrom<TestSpec> for (Node, Node) {
     }
 }
 
+fn deserialize_ast_str<'de, D>(deserializer: D) -> Result<Node, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let buf = String::deserialize(deserializer)?;
+
+    Node::try_from(buf.as_str()).map_err(serde::de::Error::custom)
+}
+
 /// Describes the action to perform when a rule matches.
 #[derive(Deserialize, Debug, Clone, PartialEq, Eq)]
 #[serde(deny_unknown_fields, untagged)]
@@ -39,6 +48,13 @@ pub enum RuleActionSpec {
     },
     /// Swaps two nodes in the AST.
     Swap { swap: (Vec<usize>, Vec<usize>) },
+    /// Constructs a replacement node by starting from some base
+    /// and performing actions against it from the original node.
+    Rewrite {
+        #[serde(deserialize_with = "deserialize_ast_str")]
+        base: Node,
+        replace: Vec<(Vec<usize>, Vec<usize>)>,
+    },
     /// Perform multiple actions in order.
     Multi(Vec<Self>),
 }
@@ -46,7 +62,7 @@ pub enum RuleActionSpec {
 impl RuleActionSpec {
     /// Applies the action to the given node.
     // TODO: Real error type.
-    pub fn apply<N: AstNode>(&self, n: &mut N) -> Result<(), ()> {
+    pub fn apply<N: AstNode + From<Node>>(&self, n: &mut N) -> Result<(), ()> {
         match self {
             Self::Replace { from, to } => {
                 let from = n.get(from.iter().map(|i| *i)).ok_or(())?.clone();
@@ -63,6 +79,16 @@ impl RuleActionSpec {
 
                 let a_mut = n.get_mut(a.iter().map(|i| *i)).ok_or(())?;
                 std::mem::swap(&mut tmp, a_mut);
+            }
+            Self::Rewrite { base, replace } => {
+                let mut out: N = N::from(base.clone());
+
+                for (from, to) in replace {
+                    let from = n.get(from.iter().map(|i| *i)).ok_or(())?.clone();
+                    let to = out.get_mut(to.iter().map(|i| *i)).ok_or(())?;
+                    *to = from;
+                }
+                *n = out;
             }
             Self::Multi(v) => {
                 for r in v.iter() {
@@ -81,7 +107,12 @@ pub struct RuleSpec {
     #[serde(alias = "match")]
     pub predicate: PredSpec,
 
-    #[serde(alias = "replace", alias = "actions", alias = "swap")]
+    #[serde(
+        alias = "replace",
+        alias = "actions",
+        alias = "swap",
+        alias = "rewrite"
+    )]
     pub action: RuleActionSpec,
 
     #[serde(default)]
@@ -106,7 +137,7 @@ pub struct Rule {
 impl Rule {
     /// Applies the rule to the specified node. True is returned if
     /// the rule matched & an action was taken.
-    pub fn eval<N: AstNode>(&self, n: &mut N) -> Result<bool, ()> {
+    pub fn eval<N: AstNode + From<Node>>(&self, n: &mut N) -> Result<bool, ()> {
         if self.pred.matches(n) {
             self.action.apply(n)?;
             Ok(true)
@@ -273,6 +304,31 @@ mod tests {
         let mut ast = Node::try_from("x * 2").unwrap();
         assert_eq!(rule.eval(&mut ast), Ok(true));
         assert_eq!(ast, Node::try_from("2x").unwrap());
+    }
+
+    #[test]
+    fn apply_rewrite() {
+        let rule: Rule = de::from_str::<RuleSpec>(
+            r#"
+            match.op = '-'
+            match.lhs = {op = 'neg'}
+            match.rhs = {not_op = 'neg'}
+
+            [rewrite]
+            base = "-(1 + 1)"
+            replace = [
+                [[0, 0], [0, 0]],
+                [[1], [0, 1]],
+            ]
+            "#,
+        )
+        .unwrap()
+        .try_into()
+        .unwrap();
+
+        let mut ast = Node::try_from("-12 - 2").unwrap();
+        assert_eq!(rule.eval(&mut ast), Ok(true));
+        assert_eq!(ast, Node::try_from("-(12 + 2)").unwrap());
     }
 
     #[test]

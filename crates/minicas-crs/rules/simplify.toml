@@ -125,3 +125,29 @@ replace.to = []
 tests = [
 	{from = 'a + 0', to = 'a'},
 ]
+
+[recip-of-div]
+match.op = '/'
+match.lhs = {const = '1'}
+match.rhs = {op = '/'}
+
+replace.from = [1]
+replace.to = []
+
+tests = [
+	{from = '1 / (1/a)', to = '1/a'},
+]
+
+[sub-with-lhs-neg]
+match.op = '-'
+match.lhs = {op = 'neg'}
+match.rhs = {not_op = 'neg'}
+tests = [
+    {from = '(-12) - 2', to = '-(12 + 2)'},
+]
+[sub-with-lhs-neg.rewrite]
+base = "-(1 + 1)"
+replace = [
+    [[0, 0], [0, 0]],
+    [[1], [0, 1]],
+]
