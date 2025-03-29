@@ -2,43 +2,37 @@
 match.op = '*'
 match.lhs = {not_op = 'const'}
 match.rhs = {op = 'const'}
-
 action.swap = [[0], [1]]
-
 tests = [
 	{from = 'x * 4', to = '4x'},
 	{from = '3x * 2', to = '2 * 3x'},
 ]
 
-[elim-div-denom-1]
-match.op = '/'
-match.rhs = {const = '1'}
-
-replace.from = [0] # using the numerator (first lhs)
-replace.to = []    # overwrite self
-
+[add-offsets-on-rhs]
+match.op = '+'
+match.lhs = {op = 'const'}
+match.rhs = {not_op = 'const'}
+action.swap = [[0], [1]]
 tests = [
-	{from = '12 / 1', to = '12'},
+	{from = '4 + x', to = 'x + 4'},
 ]
 
-[elim-div-num-0]
-match.op = '/'
-match.lhs = {const = '0'}
 
-replace.from = [0]
+[elim-negation-of-negation]
+match.op = 'neg'
+match.lhs = {op = 'neg'}
+replace.from = [0, 0]
 replace.to = []
-
 tests = [
-	{from = '0 / a', to = '0'},
+	{from = '--a', to = 'a'},
 ]
+
 
 [elim-mul-by-1]
 match.op = '*'
 match.lhs = {const = '1'}
-
 replace.from = [1]
 replace.to = []
-
 tests = [
 	{from = '1 * 12', to = '12'},
 ]
@@ -46,46 +40,48 @@ tests = [
 [elim-mul-by-0]
 match.op = '*'
 match.lhs = {const = '0'}
-
 replace.from = [0]
 replace.to = []
-
 tests = [
 	{from = '0 * a', to = '0'},
 ]
 
+[elim-div-denom-1]
+match.op = '/'
+match.rhs = {const = '1'}
+replace.from = [0] # using the numerator (first lhs)
+replace.to = []    # overwrite self
+tests = [
+	{from = '12 / 1', to = '12'},
+]
+
+[elim-div-num-0]
+match.op = '/'
+match.lhs = {const = '0'}
+replace.from = [0]
+replace.to = []
+tests = [
+	{from = '0 / a', to = '0'},
+]
+
+
 [abs-of-negation]
 match.op = 'abs'
 match.lhs = {op = 'neg'}
-
 replace.from = [0, 0]
 replace.to = [0]
-
 tests = [
 	{from = '|-a|', to = '|a|'},
-]
-
-[elim-negation-of-negation]
-match.op = 'neg'
-match.lhs = {op = 'neg'}
-
-replace.from = [0, 0]
-replace.to = []
-
-tests = [
-	{from = '--a', to = 'a'},
 ]
 
 [div-with-two-negations]
 match.op = '/'
 match.lhs = {op = 'neg'}
 match.rhs = {op = 'neg'}
-
 actions = [
     {from = [0, 0], to = [0]},
     {from = [1, 0], to = [1]},
 ]
-
 tests = [
 	{from = '(-a)/(-b)', to = 'a/b'},
 ]
@@ -94,23 +90,61 @@ tests = [
 match.op = '*'
 match.lhs = {op = 'neg'}
 match.rhs = {op = 'neg'}
-
 actions = [
     {from = [0, 0], to = [0]},
     {from = [1, 0], to = [1]},
 ]
-
 tests = [
 	{from = '(-a) * (-b)', to = 'a*b'},
+]
+
+[add-with-two-negations]
+match.op = '+'
+match.lhs = {op = 'neg'}
+match.rhs = {op = 'neg'}
+tests = [
+	{from = '(-a) + (-b)', to = '-(a+b)'},
+]
+[add-with-two-negations.rewrite]
+base = "-(1 + 1)"
+replace = [
+    [[0, 0], [0, 0]],
+    [[1, 0], [0, 1]],
+]
+
+[add-with-rhs-negation]
+match.op = '+'
+match.lhs = {not_op = 'neg'}
+match.rhs = {op = 'neg'}
+tests = [
+	{from = 'a + (-b)', to = 'a - b'},
+]
+[add-with-rhs-negation.rewrite]
+base = "1 - 1"
+replace = [
+    [[0], [0]],
+    [[1, 0], [1]],
+]
+
+[add-with-lhs-negation]
+match.op = '+'
+match.lhs = {op = 'neg'}
+match.rhs = {not_op = 'neg'}
+tests = [
+	{from = '-a + b', to = 'b - a'},
+]
+[add-with-lhs-negation.rewrite]
+base = "1 - 1"
+replace = [
+    [[0, 0], [1]],
+    [[1], [0]],
 ]
 
 [elim-add-with-0-lhs]
 match.op = '+'
 match.lhs = {const = '0'}
-
 replace.from = [1]
 replace.to = []
-
 tests = [
 	{from = '0 + a', to = 'a'},
 ]
@@ -118,10 +152,8 @@ tests = [
 [elim-add-with-0-rhs]
 match.op = '+'
 match.rhs = {const = '0'}
-
 replace.from = [0]
 replace.to = []
-
 tests = [
 	{from = 'a + 0', to = 'a'},
 ]
@@ -130,10 +162,8 @@ tests = [
 match.op = '/'
 match.lhs = {const = '1'}
 match.rhs = {op = '/'}
-
 replace.from = [1]
 replace.to = []
-
 tests = [
 	{from = '1 / (1/a)', to = '1/a'},
 ]
@@ -143,11 +173,46 @@ match.op = '-'
 match.lhs = {op = 'neg'}
 match.rhs = {not_op = 'neg'}
 tests = [
-    {from = '(-12) - 2', to = '-(12 + 2)'},
+    {from = '(-a) - b', to = '-(a + b)'},
 ]
 [sub-with-lhs-neg.rewrite]
 base = "-(1 + 1)"
 replace = [
     [[0, 0], [0, 0]],
     [[1], [0, 1]],
+]
+
+[sub-with-rhs-neg]
+match.op = '-'
+match.lhs = {not_op = 'neg'}
+match.rhs = {op = 'neg'}
+tests = [
+    {from = 'a--b', to = 'a + b'},
+]
+[sub-with-rhs-neg.rewrite]
+base = "1 + 1"
+replace = [
+    [[0], [0]],
+    [[1, 0], [1]],
+]
+
+[elim-sub-num-0-lhs]
+match.op = '-'
+match.lhs = {const = '0'}
+tests = [
+	{from = '0 - a', to = '-a'},
+]
+[elim-sub-num-0-lhs.rewrite]
+base = "-a"
+replace = [
+    [[1], [0]],
+]
+
+[elim-sub-num-0-rhs]
+match.op = '-'
+match.rhs = {const = '0'}
+replace.from = [0]
+replace.to = []
+tests = [
+	{from = 'a - 0', to = 'a'},
 ]
