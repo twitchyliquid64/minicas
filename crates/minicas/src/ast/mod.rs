@@ -76,6 +76,11 @@ pub trait AstNode: Clone + Sized + std::fmt::Debug {
     /// the referenced node. A value of 0 means the left-hand side or unary
     /// operand, and a value of 1 means the right-hand side operand.
     fn get_mut<I: Iterator<Item = usize>>(&mut self, i: I) -> Option<&mut NodeInner>;
+
+    /// Returns whether the operator is left-associative, and its precedence.
+    ///
+    /// None is returned if precedence is unambiguous.
+    fn parsing_precedence(&self) -> Option<(bool, usize)>;
 }
 
 /// High-level type representing any node.
@@ -119,6 +124,9 @@ impl AstNode for Node {
     }
     fn get_mut<I: Iterator<Item = usize>>(&mut self, mut i: I) -> Option<&mut NodeInner> {
         self.n.get_mut(&mut i)
+    }
+    fn parsing_precedence(&self) -> Option<(bool, usize)> {
+        self.n.parsing_precedence()
     }
 }
 
@@ -270,6 +278,9 @@ impl AstNode for HN {
     fn get_mut<I: Iterator<Item = usize>>(&mut self, i: I) -> Option<&mut NodeInner> {
         self.0.get_mut(i)
     }
+    fn parsing_precedence(&self) -> Option<(bool, usize)> {
+        self.0.parsing_precedence()
+    }
 }
 
 impl Deref for HN {
@@ -392,6 +403,16 @@ impl NodeInner {
             None => Some(self),
         }
     }
+
+    /// Returns a neatly-formatted string representation of the AST.
+    pub fn pretty_str(&self, parent_precedence: Option<usize>) -> String {
+        match self {
+            Self::Const(c) => format!("{}", c),
+            Self::Unary(u) => u.pretty_str(parent_precedence),
+            Self::Binary(b) => b.pretty_str(parent_precedence),
+            Self::Var(v) => format!("{}", v),
+        }
+    }
 }
 
 impl AstNode for NodeInner {
@@ -500,6 +521,13 @@ impl AstNode for NodeInner {
     fn get_mut<I: Iterator<Item = usize>>(&mut self, mut i: I) -> Option<&mut NodeInner> {
         NodeInner::get_mut(self, &mut i)
     }
+    fn parsing_precedence(&self) -> Option<(bool, usize)> {
+        match self {
+            Self::Const(_) | Self::Var(_) => None,
+            Self::Unary(u) => u.op.parsing_precedence(),
+            Self::Binary(b) => b.op.parsing_precedence(),
+        }
+    }
 }
 
 impl From<Const> for NodeInner {
@@ -530,12 +558,7 @@ impl From<Node> for NodeInner {
 
 impl fmt::Display for NodeInner {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Const(c) => fmt::Display::fmt(c, f),
-            Self::Unary(u) => fmt::Display::fmt(u, f),
-            Self::Binary(b) => fmt::Display::fmt(b, f),
-            Self::Var(v) => fmt::Display::fmt(v, f),
-        }
+        f.write_str(&self.pretty_str(None))
     }
 }
 
@@ -586,13 +609,80 @@ mod tests {
     #[test]
     fn fmt_basic() {
         assert_eq!(
-            "3 - -5",
+            "3 * (a + b)",
             format!(
                 "{}",
                 Node::new(
-                    Binary::sub::<TyValue, HN>(
+                    Binary::mul::<TyValue, HN>(
                         3.into(),
-                        Node::new(Unary::negate::<TyValue>(5.into()).into()).into(),
+                        Node::new(
+                            Binary::add::<HN, HN>(
+                                Node::new(Var::new_untyped("a").into()).into(),
+                                Node::new(Var::new_untyped("b").into()).into(),
+                            )
+                            .into()
+                        )
+                        .into(),
+                    )
+                    .into()
+                )
+            )
+        );
+        assert_eq!(
+            "(a + b) * 3",
+            format!(
+                "{}",
+                Node::new(
+                    Binary::mul::<HN, TyValue>(
+                        Node::new(
+                            Binary::add::<HN, HN>(
+                                Node::new(Var::new_untyped("a").into()).into(),
+                                Node::new(Var::new_untyped("b").into()).into(),
+                            )
+                            .into()
+                        )
+                        .into(),
+                        3.into(),
+                    )
+                    .into()
+                )
+            )
+        );
+        assert_eq!(
+            "3 + a * b",
+            format!(
+                "{}",
+                Node::new(
+                    Binary::add::<TyValue, HN>(
+                        3.into(),
+                        Node::new(
+                            Binary::mul::<HN, HN>(
+                                Node::new(Var::new_untyped("a").into()).into(),
+                                Node::new(Var::new_untyped("b").into()).into(),
+                            )
+                            .into()
+                        )
+                        .into(),
+                    )
+                    .into()
+                )
+            )
+        );
+        assert_eq!(
+            "a * b + 3",
+            format!(
+                "{}",
+                Node::new(
+                    Binary::add::<HN, TyValue>(
+                        Node::new(
+                            Binary::mul::<HN, HN>(
+                                Node::new(Var::new_untyped("a").into()).into(),
+                                Node::new(Var::new_untyped("b").into()).into(),
+                            )
+                            .into()
+                        )
+                        .into(),
+                        3.into(),
                     )
                     .into()
                 )
@@ -607,6 +697,34 @@ mod tests {
                     Binary::sub::<TyValue, HN>(
                         3.into(),
                         Node::new(Var::new_untyped("x").into()).into(),
+                    )
+                    .into()
+                )
+            )
+        );
+
+        assert_eq!(
+            "3 - (-5)",
+            format!(
+                "{}",
+                Node::new(
+                    Binary::sub::<TyValue, HN>(
+                        3.into(),
+                        Node::new(Unary::negate::<TyValue>(5.into()).into()).into(),
+                    )
+                    .into()
+                )
+            )
+        );
+
+        assert_eq!(
+            "3 - |5|",
+            format!(
+                "{}",
+                Node::new(
+                    Binary::sub::<TyValue, HN>(
+                        3.into(),
+                        Node::new(Unary::abs::<TyValue>(5.into()).into()).into(),
                     )
                     .into()
                 )

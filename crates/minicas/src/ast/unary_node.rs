@@ -20,6 +20,17 @@ impl UnaryOp {
             (Abs, Some(Bool)) => false,
         }
     }
+
+    /// Returns whether the operator is left-associative, and its precedence.
+    ///
+    /// None is returned if precedence is unambiguous.
+    pub fn parsing_precedence(&self) -> Option<(bool, usize)> {
+        use UnaryOp::*;
+        match self {
+            Negate => Some((true, 1)),
+            Abs => None,
+        }
+    }
 }
 
 impl fmt::Display for UnaryOp {
@@ -98,15 +109,33 @@ impl Unary {
             }
         }
     }
+
+    pub(crate) fn pretty_str(&self, parent_precedence: Option<usize>) -> String {
+        match self.op.parsing_precedence() {
+            Some((left_assoc, prec)) => {
+                let tmp = match self.op {
+                    UnaryOp::Negate => format!("{}{}", self.op, self.val.pretty_str(Some(prec))),
+                    _ => unreachable!(),
+                };
+
+                if let Some(parent_precedence) = parent_precedence {
+                    if parent_precedence > prec {
+                        return format!("({})", tmp);
+                    }
+                }
+                tmp
+            }
+            None => match self.op {
+                UnaryOp::Abs => format!("|{}|", self.val.pretty_str(None)),
+                _ => unreachable!(),
+            },
+        }
+    }
 }
 
 impl fmt::Display for Unary {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use UnaryOp::*;
-        match self.op {
-            Negate => write!(f, "-{}", self.val),
-            Abs => write!(f, "|{}|", self.val),
-        }
+        write!(f, "{}", self.pretty_str(None))
     }
 }
 

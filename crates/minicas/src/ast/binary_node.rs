@@ -38,6 +38,20 @@ impl BinaryOp {
         }
     }
 
+    /// Returns whether the operator is left-associative, and its precedence.
+    ///
+    /// None is returned if precedence is unambiguous.
+    pub fn parsing_precedence(&self) -> Option<(bool, usize)> {
+        use BinaryOp::*;
+        match self {
+            Add => Some((true, 2)),
+            Sub => Some((true, 2)),
+            Mul => Some((true, 3)),
+            Div => Some((true, 3)),
+            Cmp(CmpOp::Equals) => Some((true, 4)),
+        }
+    }
+
     /// Returns true if the operation is associative, or false otherwise.
     pub fn associative(&self) -> bool {
         use BinaryOp::*;
@@ -192,15 +206,56 @@ impl Binary {
             },
         }
     }
+
+    pub(crate) fn pretty_str(&self, parent_precedence: Option<usize>) -> String {
+        match self.op.parsing_precedence() {
+            Some((left_assoc, prec)) => {
+                let left_needs_parens = match (self.lhs.parsing_precedence(), left_assoc) {
+                    (None, _) => false,
+                    (Some((_, _lhs_prec)), false) => todo!(),
+                    (Some((_, lhs_prec)), true) => lhs_prec < prec,
+                };
+                let right_needs_parens = match (self.rhs.parsing_precedence(), left_assoc) {
+                    (None, _) => false,
+                    (Some((_, _rhs_prec)), false) => todo!(),
+                    (Some((_, rhs_prec)), true) => rhs_prec < prec,
+                };
+
+                let tmp = format!(
+                    "{} {} {}",
+                    if left_needs_parens {
+                        format!("({})", self.lhs.pretty_str(None))
+                    } else {
+                        self.lhs.pretty_str(Some(prec))
+                    },
+                    self.op,
+                    if right_needs_parens {
+                        format!("({})", self.rhs.pretty_str(None))
+                    } else {
+                        self.rhs.pretty_str(Some(prec))
+                    }
+                );
+
+                if let Some(parent_precedence) = parent_precedence {
+                    if parent_precedence > prec {
+                        return format!("({})", tmp);
+                    }
+                }
+                tmp
+            }
+            None => format!(
+                "{} {} {}",
+                self.lhs.pretty_str(None),
+                self.op,
+                self.rhs.pretty_str(None)
+            ),
+        }
+    }
 }
 
 impl fmt::Display for Binary {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use BinaryOp::*;
-        match self.op {
-            Add | Sub | Mul | Div => write!(f, "{} {} {}", self.lhs, self.op, self.rhs),
-            Cmp(CmpOp::Equals) => write!(f, "{} {} {}", self.lhs, self.op, self.rhs),
-        }
+        write!(f, "{}", self.pretty_str(None))
     }
 }
 
