@@ -1,7 +1,7 @@
 use nom::{
     branch::alt,
     bytes::complete::tag,
-    character::complete::{alpha1, digit1, multispace0},
+    character::complete::{alpha1, digit0, digit1, multispace0},
     combinator::{fail, map_res},
     sequence::{delimited, preceded},
     IResult,
@@ -61,10 +61,11 @@ fn parser(i: &str) -> IResult<&str, ParseNode> {
                 },
             ),
             map_res(
-                preceded(multispace0, (digit1, alpha1)),
-                |(co_eff, ident): (&str, &str)| {
+                preceded(multispace0, (digit1, alpha1, digit0)),
+                |(co_eff, ident, trailing_num): (&str, &str, &str)| {
                     if let Ok(co_eff) = co_eff.parse::<u64>() {
-                        return Ok(ParseNode::IdentWithCoefficient(co_eff, ident.into()));
+                        let ident = String::from(ident) + trailing_num;
+                        return Ok(ParseNode::IdentWithCoefficient(co_eff, ident));
                     }
                     Err(())
                 },
@@ -81,9 +82,13 @@ fn parser(i: &str) -> IResult<&str, ParseNode> {
             map_res(preceded(multispace0, tag("false")), |_| {
                 Ok::<ParseNode<'_>, ()>(ParseNode::Bool(false))
             }),
-            map_res(preceded(multispace0, alpha1), |s: &str| {
-                Ok::<ParseNode<'_>, ()>(ParseNode::Ident(s.into()))
-            }),
+            map_res(
+                preceded(multispace0, (alpha1, digit0)),
+                |(s, t): (&str, &str)| {
+                    let ident = String::from(s) + t;
+                    Ok::<ParseNode<'_>, ()>(ParseNode::Ident(ident))
+                },
+            ),
             map_res(
                 preceded(multispace0, delimited(tag("|"), parser, tag("|"))),
                 |n| Ok::<ParseNode<'_>, ()>(ParseNode::Abs(Box::new(n))),
@@ -123,6 +128,11 @@ fn vars() {
     assert_eq!(
         parser("2x"),
         Ok(("", ParseNode::IdentWithCoefficient(2, "x".into())))
+    );
+    assert_eq!(parser("a1"), Ok(("", ParseNode::Ident("a1".into()))));
+    assert_eq!(
+        parser("2x11"),
+        Ok(("", ParseNode::IdentWithCoefficient(2, "x11".into())))
     );
 }
 
