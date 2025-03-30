@@ -3,6 +3,7 @@ use std::fmt;
 use std::ops::{Deref, DerefMut};
 
 use crate::ty::{Ty, TyValue};
+use crate::Path;
 
 mod const_node;
 pub use const_node::Const;
@@ -14,8 +15,6 @@ mod variable_node;
 pub use variable_node::Var;
 
 mod parse;
-mod path;
-pub use path::Path;
 
 mod ac_collect;
 pub use ac_collect::{ac_collect, AcError};
@@ -521,6 +520,11 @@ impl From<Unary> for NodeInner {
 impl From<Var> for NodeInner {
     fn from(n: Var) -> Self {
         Self::Var(n)
+    }
+}
+impl From<Node> for NodeInner {
+    fn from(n: Node) -> Self {
+        Self::from(n.n)
     }
 }
 

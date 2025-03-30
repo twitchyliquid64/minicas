@@ -1,6 +1,6 @@
 //! Predicate rules/matching for AST nodes.
 use crate::ast::{AstNode, BinaryOp, NodeInner, UnaryOp};
-use crate::TyValue;
+use crate::{Path, TyValue};
 
 /// Describes a predicate on the operation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -54,6 +54,9 @@ pub struct Predicate {
     /// Match if the node is a constant with some value.
     pub const_value: Option<TyValue>,
 
+    /// Match if the descendant nodes specified by the two paths are equal.
+    pub equivalent: Vec<(Path, Path)>,
+
     /// Match only on nodes whos children match the given predicates respectively.
     ///
     /// A `None` value in some position means to skip considering the child in that
@@ -97,6 +100,17 @@ impl Predicate {
                 }
             }
             (Some(_), _) => {
+                return false;
+            }
+        }
+
+        for (l, r) in self.equivalent.iter() {
+            let (l, r) = (n.get(l.iter()), n.get(r.iter()));
+            if let (Some(l), Some(r)) = (l, r) {
+                if l != r {
+                    return false;
+                }
+            } else {
                 return false;
             }
         }
@@ -147,6 +161,35 @@ mod tests {
         );
         assert_eq!(
             PredicateOp::Const.matches(&Node::try_from("5").unwrap()),
+            true,
+        );
+    }
+
+    #[test]
+    fn equivalent_matches() {
+        assert_eq!(
+            Predicate {
+                equivalent: vec![(vec![0].into(), vec![1].into())],
+                ..Default::default()
+            }
+            .matches(&Node::try_from("x + x").unwrap()),
+            true,
+        );
+        assert_eq!(
+            Predicate {
+                equivalent: vec![(vec![0].into(), vec![1].into())],
+                ..Default::default()
+            }
+            .matches(&Node::try_from("x + 2x").unwrap()),
+            false,
+        );
+
+        assert_eq!(
+            Predicate {
+                equivalent: vec![(vec![0].into(), vec![1, 0].into())],
+                ..Default::default()
+            }
+            .matches(&Node::try_from("a * (a + 1)").unwrap()),
             true,
         );
     }

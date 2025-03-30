@@ -1,6 +1,6 @@
 /// A compact representation of the path to take through an AST to
 /// reach a certain node.
-#[derive(Debug, Clone, Hash)]
+#[derive(Debug, Clone, Eq, Hash)]
 pub enum Path {
     Opt(u64, usize),
     Vec(Vec<usize>),

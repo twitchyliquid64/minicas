@@ -100,10 +100,21 @@ impl RuleActionSpec {
     }
 }
 
+/// Describes metadata about a rule.
+#[derive(Deserialize, Debug, Default, Clone, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct MetaSpec {
+    #[serde(default)]
+    pub is_simplify: bool,
+}
+
 /// Describes how a rule is specified in a rule file.
 #[derive(Deserialize, Debug, Clone, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct RuleSpec {
+    #[serde(default)]
+    pub meta: MetaSpec,
+
     #[serde(alias = "match")]
     pub predicate: PredSpec,
 
@@ -129,6 +140,7 @@ pub struct RuleFileSpec {
 /// An AST update rule.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Rule {
+    pub meta: MetaSpec,
     pred: Predicate,
     action: RuleActionSpec,
     tests: Vec<(Node, Node)>,
@@ -168,6 +180,7 @@ impl TryFrom<RuleSpec> for Rule {
 
     fn try_from(s: RuleSpec) -> Result<Self, Self::Error> {
         Ok(Self {
+            meta: s.meta,
             pred: s.predicate.try_into()?,
             action: s.action,
             tests: s
@@ -204,6 +217,7 @@ mod tests {
             "#
             ),
             Ok(RuleSpec {
+                meta: MetaSpec::default(),
                 predicate: PredSpec {
                     op: Some("/".to_string()),
                     rhs: Some(Box::new(PredSpec {
@@ -243,6 +257,7 @@ mod tests {
             .unwrap()
             .try_into(),
             Ok(Rule {
+                meta: MetaSpec::default(),
                 pred: Predicate {
                     op: Some(PredicateOp::Binary(BinaryOp::Div)),
                     children: vec![

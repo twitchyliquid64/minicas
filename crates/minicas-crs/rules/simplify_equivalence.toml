@@ -1,0 +1,43 @@
+[add-with-identical-operands]
+meta = {is_simplify = true}
+match.op = '+'
+match.lhs = {not_op = 'const'}
+match.rhs = {not_op = 'const'}
+match.equal = [{l = [0], r = [1]}]
+
+tests = [
+	{from = 'a + a', to = '2a'},
+]
+[add-with-identical-operands.rewrite]
+base = "2 * 1"
+replace = [
+    [[0], [1]],
+]
+
+[sub-with-identical-operands]
+meta = {is_simplify = true}
+match.op = '-'
+match.lhs = {not_op = 'const'}
+match.rhs = {not_op = 'const'}
+match.equal = [{l = [0], r = [1]}]
+
+tests = [
+    {from = 'a - a', to = '0'},
+]
+[sub-with-identical-operands.rewrite]
+base = "0"
+replace = []
+
+[div-with-identical-operands]
+meta = {is_simplify = true}
+match.op = '/'
+match.lhs = {not_op = 'const'}
+match.rhs = {not_op = 'const'}
+match.equal = [{l = [0], r = [1]}]
+
+tests = [
+    {from = 'a / a', to = '1'},
+]
+[div-with-identical-operands.rewrite]
+base = "1"
+replace = []

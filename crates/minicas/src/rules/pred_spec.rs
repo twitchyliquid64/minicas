@@ -3,6 +3,14 @@ use crate::pred::{Predicate, PredicateOp};
 use serde::Deserialize;
 use std::convert::TryInto;
 
+#[derive(Deserialize, Default, Debug, Clone, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct EqualPair {
+    l: Vec<usize>,
+    #[serde(alias = "and")]
+    r: Vec<usize>,
+}
+
 /// Describes how a predicate is specified in a rule file.
 #[derive(Deserialize, Default, Debug, Clone, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
@@ -12,6 +20,9 @@ pub struct PredSpec {
 
     #[serde(alias = "const")]
     pub const_val: Option<String>,
+
+    #[serde(alias = "equivalent")]
+    pub equal: Option<Vec<EqualPair>>,
 
     #[serde(alias = "operand")]
     pub lhs: Option<Box<PredSpec>>,
@@ -34,6 +45,11 @@ impl TryInto<Predicate> for PredSpec {
             ],
             (None, None) => vec![],
         };
+
+        let equivalent = self
+            .equal
+            .map(|v| v.into_iter().map(|p| (p.l.into(), p.r.into())).collect())
+            .unwrap_or(vec![]);
 
         Ok(Predicate {
             op: match self.op {
@@ -68,6 +84,7 @@ impl TryInto<Predicate> for PredSpec {
                 },
                 None => None,
             },
+            equivalent,
             children,
             ..Predicate::default()
         })

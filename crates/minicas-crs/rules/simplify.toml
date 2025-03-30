@@ -1,4 +1,5 @@
 [mul-coefficients-on-lhs]
+meta = {is_simplify = true}
 match.op = '*'
 match.lhs = {not_op = 'const'}
 match.rhs = {op = 'const'}
@@ -9,6 +10,7 @@ tests = [
 ]
 
 [add-offsets-on-rhs]
+meta = {is_simplify = true}
 match.op = '+'
 match.lhs = {op = 'const'}
 match.rhs = {not_op = 'const'}
@@ -19,6 +21,7 @@ tests = [
 
 
 [elim-negation-of-negation]
+meta = {is_simplify = true}
 match.op = 'neg'
 match.lhs = {op = 'neg'}
 replace.from = [0, 0]
@@ -29,6 +32,7 @@ tests = [
 
 
 [elim-mul-by-1]
+meta = {is_simplify = true}
 match.op = '*'
 match.lhs = {const = '1'}
 replace.from = [1]
@@ -38,6 +42,7 @@ tests = [
 ]
 
 [elim-mul-by-0]
+meta = {is_simplify = true}
 match.op = '*'
 match.lhs = {const = '0'}
 replace.from = [0]
@@ -47,6 +52,7 @@ tests = [
 ]
 
 [elim-div-denom-1]
+meta = {is_simplify = true}
 match.op = '/'
 match.rhs = {const = '1'}
 replace.from = [0] # using the numerator (first lhs)
@@ -56,6 +62,7 @@ tests = [
 ]
 
 [elim-div-num-0]
+meta = {is_simplify = true}
 match.op = '/'
 match.lhs = {const = '0'}
 replace.from = [0]
@@ -66,6 +73,7 @@ tests = [
 
 
 [abs-of-negation]
+meta = {is_simplify = true}
 match.op = 'abs'
 match.lhs = {op = 'neg'}
 replace.from = [0, 0]
@@ -75,6 +83,7 @@ tests = [
 ]
 
 [div-with-two-negations]
+meta = {is_simplify = true}
 match.op = '/'
 match.lhs = {op = 'neg'}
 match.rhs = {op = 'neg'}
@@ -87,6 +96,7 @@ tests = [
 ]
 
 [mul-with-two-negations]
+meta = {is_simplify = true}
 match.op = '*'
 match.lhs = {op = 'neg'}
 match.rhs = {op = 'neg'}
@@ -99,6 +109,7 @@ tests = [
 ]
 
 [add-with-two-negations]
+meta = {is_simplify = true}
 match.op = '+'
 match.lhs = {op = 'neg'}
 match.rhs = {op = 'neg'}
@@ -113,6 +124,7 @@ replace = [
 ]
 
 [add-with-rhs-negation]
+meta = {is_simplify = true}
 match.op = '+'
 match.lhs = {not_op = 'neg'}
 match.rhs = {op = 'neg'}
@@ -127,6 +139,7 @@ replace = [
 ]
 
 [add-with-lhs-negation]
+meta = {is_simplify = true}
 match.op = '+'
 match.lhs = {op = 'neg'}
 match.rhs = {not_op = 'neg'}
@@ -141,6 +154,7 @@ replace = [
 ]
 
 [elim-add-with-0-lhs]
+meta = {is_simplify = true}
 match.op = '+'
 match.lhs = {const = '0'}
 replace.from = [1]
@@ -150,6 +164,7 @@ tests = [
 ]
 
 [elim-add-with-0-rhs]
+meta = {is_simplify = true}
 match.op = '+'
 match.rhs = {const = '0'}
 replace.from = [0]
@@ -159,6 +174,7 @@ tests = [
 ]
 
 [recip-of-div]
+meta = {is_simplify = true}
 match.op = '/'
 match.lhs = {const = '1'}
 match.rhs = {op = '/'}
@@ -169,6 +185,7 @@ tests = [
 ]
 
 [sub-with-lhs-neg]
+meta = {is_simplify = true}
 match.op = '-'
 match.lhs = {op = 'neg'}
 match.rhs = {not_op = 'neg'}
@@ -183,6 +200,7 @@ replace = [
 ]
 
 [sub-with-rhs-neg]
+meta = {is_simplify = true}
 match.op = '-'
 match.lhs = {not_op = 'neg'}
 match.rhs = {op = 'neg'}
@@ -197,6 +215,7 @@ replace = [
 ]
 
 [elim-sub-num-0-lhs]
+meta = {is_simplify = true}
 match.op = '-'
 match.lhs = {const = '0'}
 tests = [
@@ -209,6 +228,7 @@ replace = [
 ]
 
 [elim-sub-num-0-rhs]
+meta = {is_simplify = true}
 match.op = '-'
 match.rhs = {const = '0'}
 replace.from = [0]
