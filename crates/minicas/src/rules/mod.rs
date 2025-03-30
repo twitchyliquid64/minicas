@@ -54,6 +54,8 @@ pub enum RuleActionSpec {
         #[serde(deserialize_with = "deserialize_ast_str")]
         base: Node,
         replace: Vec<(Vec<usize>, Vec<usize>)>,
+        #[serde(default)]
+        fold: Vec<Vec<usize>>,
     },
     /// Perform multiple actions in order.
     Multi(Vec<Self>),
@@ -80,7 +82,11 @@ impl RuleActionSpec {
                 let a_mut = n.get_mut(a.iter().map(|i| *i)).ok_or(())?;
                 std::mem::swap(&mut tmp, a_mut);
             }
-            Self::Rewrite { base, replace } => {
+            Self::Rewrite {
+                base,
+                replace,
+                fold,
+            } => {
                 let mut out: N = N::from(base.clone());
 
                 for (from, to) in replace {
@@ -88,6 +94,11 @@ impl RuleActionSpec {
                     let to = out.get_mut(to.iter().map(|i| *i)).ok_or(())?;
                     *to = from;
                 }
+                for path in fold {
+                    let target = out.get_mut(path.iter().map(|i| *i)).ok_or(())?;
+                    crate::ast::fold(target).map_err(|_| ())?;
+                }
+
                 *n = out;
             }
             Self::Multi(v) => {
@@ -159,16 +170,16 @@ impl Rule {
     }
 
     /// Run the self tests.
-    pub fn self_test(&self) -> Result<(), usize> {
+    pub fn self_test(&self) -> Result<(), (usize, String)> {
         for (i, (from, to)) in self.tests.iter().enumerate() {
             let mut n = from.clone();
             match self.eval(&mut n) {
                 Ok(true) => {}
-                Ok(false) => return Err(i),
-                Err(()) => return Err(i),
+                Ok(false) => return Err((i, "predicate did not match".to_string())),
+                Err(()) => return Err((i, "evaluation failed".to_string())),
             }
             if &n != to {
-                return Err(i);
+                return Err((i, format!("got result {}", n)));
             }
         }
         Ok(())
@@ -370,6 +381,6 @@ mod tests {
 
         // mess up the test result
         rule.tests[0].1 = Node::try_from("4x").unwrap();
-        assert_eq!(rule.self_test(), Err(0));
+        assert_eq!(rule.self_test(), Err((0, "got result 12".to_string())));
     }
 }

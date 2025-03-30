@@ -222,7 +222,7 @@ tests = [
 	{from = '0 - a', to = '-a'},
 ]
 [elim-sub-num-0-lhs.rewrite]
-base = "-a"
+base = "-1"
 replace = [
     [[1], [0]],
 ]
