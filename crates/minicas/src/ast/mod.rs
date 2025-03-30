@@ -5,14 +5,14 @@ use std::ops::{Deref, DerefMut};
 use crate::ty::{Ty, TyValue};
 use crate::Path;
 
-mod const_node;
-pub use const_node::Const;
-mod binary_node;
-pub use binary_node::{Binary, BinaryOp, CmpOp};
-mod unary_node;
-pub use unary_node::{Unary, UnaryOp};
-mod variable_node;
-pub use variable_node::Var;
+mod node_const;
+pub use node_const::Const;
+mod node_binary;
+pub use node_binary::{Binary, BinaryOp, CmpOp};
+mod node_unary;
+pub use node_unary::{Unary, UnaryOp};
+mod node_variable;
+pub use node_variable::Var;
 
 mod parse;
 

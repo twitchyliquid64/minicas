@@ -112,7 +112,7 @@ impl Unary {
 
     pub(crate) fn pretty_str(&self, parent_precedence: Option<usize>) -> String {
         match self.op.parsing_precedence() {
-            Some((left_assoc, prec)) => {
+            Some((_left_assoc, prec)) => {
                 let tmp = match self.op {
                     UnaryOp::Negate => format!("{}{}", self.op, self.val.pretty_str(Some(prec))),
                     _ => unreachable!(),
