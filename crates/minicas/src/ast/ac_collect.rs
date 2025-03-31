@@ -28,8 +28,7 @@ fn ac_collect_recursive(
             }
         }
 
-        // nothing contained to walk
-        NodeInner::Const(_) | NodeInner::Var(_) | NodeInner::Unary(_) => {
+        NodeInner::Const(_) | NodeInner::Var(_) | NodeInner::Unary(_) | NodeInner::Piecewise(_) => {
             let self_path = path.clone();
             terms.push(self_path);
         }

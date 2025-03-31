@@ -6,6 +6,8 @@ use crate::Ty;
 pub enum TypeError {
     UnaryIncompatible(UnaryOp, Option<Ty>),
     BinaryIncompatible(BinaryOp, Option<Ty>, Option<Ty>),
+    PiecewiseCondNotBool(usize, Option<Ty>),
+    PiecewiseDifferentBranchTypes(Ty, Ty),
 }
 
 /// Checks an AST for type errors.
@@ -36,6 +38,41 @@ pub fn typecheck<N: AstNode>(n: &N) -> Result<(), TypeError> {
                 true
             }
         }
+
+        NodeInner::Piecewise(p) => {
+            let mut arm_ty = None;
+            for (i, (e, cond)) in p.iter_branches().enumerate() {
+                let ret = cond.returns();
+                if ret != Some(Ty::Bool) {
+                    err = Err(TypeError::PiecewiseCondNotBool(i, ret));
+                    return false;
+                }
+
+                match (arm_ty, e.returns()) {
+                    (None, Some(b_ty)) => {
+                        arm_ty = Some(b_ty);
+                    }
+                    (Some(last_ty), Some(b_ty)) => {
+                        if last_ty != b_ty {
+                            err = Err(TypeError::PiecewiseDifferentBranchTypes(last_ty, b_ty));
+                            return false;
+                        }
+                    }
+                    _ => {}
+                };
+            }
+
+            match (arm_ty, p.else_branch().returns()) {
+                (Some(arm_ty), Some(else_ty)) => {
+                    if arm_ty != else_ty {
+                        err = Err(TypeError::PiecewiseDifferentBranchTypes(arm_ty, else_ty));
+                        return false;
+                    }
+                }
+                _ => {}
+            }
+            true
+        }
     });
 
     err
@@ -44,7 +81,7 @@ pub fn typecheck<N: AstNode>(n: &N) -> Result<(), TypeError> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ast::Node;
+    use crate::ast::{Node, Piecewise};
 
     #[test]
     fn basic() {
@@ -78,6 +115,73 @@ mod tests {
                 BinaryOp::Add,
                 Some(Ty::Rational),
                 Some(Ty::Bool),
+            )),
+        );
+    }
+
+    #[test]
+    fn piecewise() {
+        assert_eq!(
+            typecheck(&NodeInner::from(Piecewise::new(
+                vec![],
+                Node::try_from("x").unwrap().into()
+            ))),
+            Ok(()),
+        );
+        assert_eq!(
+            typecheck(&NodeInner::from(Piecewise::new(
+                vec![(
+                    Node::try_from("-x").unwrap().into(),
+                    Node::try_from("false").unwrap().into()
+                )],
+                Node::try_from("x").unwrap().into()
+            ))),
+            Ok(()),
+        );
+
+        // Cond is not bool
+        assert_eq!(
+            typecheck(&NodeInner::from(Piecewise::new(
+                vec![(
+                    Node::try_from("-x").unwrap().into(),
+                    Node::try_from("5").unwrap().into()
+                )],
+                Node::try_from("x").unwrap().into()
+            ))),
+            Err(TypeError::PiecewiseCondNotBool(0, Some(Ty::Rational))),
+        );
+        // Branch arms different types
+        assert_eq!(
+            typecheck(&NodeInner::from(Piecewise::new(
+                vec![
+                    (
+                        Node::try_from("-5").unwrap().into(),
+                        Node::try_from("x == y").unwrap().into()
+                    ),
+                    (
+                        Node::try_from("x == 5").unwrap().into(),
+                        Node::try_from("x == y").unwrap().into()
+                    )
+                ],
+                Node::try_from("x").unwrap().into()
+            ))),
+            Err(TypeError::PiecewiseDifferentBranchTypes(
+                Ty::Rational,
+                Ty::Bool
+            )),
+        );
+        // Branch arms and else different types
+        assert_eq!(
+            typecheck(&NodeInner::from(Piecewise::new(
+                vec![(
+                    Node::try_from("x == 5").unwrap().into(),
+                    Node::try_from("x == y").unwrap().into()
+                )],
+                Node::try_from("5").unwrap().into()
+            ))),
+            Err(TypeError::PiecewiseDifferentBranchTypes(
+                Ty::Bool,
+                Ty::Rational
             )),
         );
     }

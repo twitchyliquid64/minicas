@@ -1,4 +1,4 @@
-use crate::ast::{AstNode, EvalContext, EvalError, HN};
+use crate::ast::{AstNode, EvalContext, EvalError, NodeInner, HN};
 use crate::{Ty, TyValue};
 use num::CheckedDiv;
 use std::fmt;
@@ -208,6 +208,13 @@ impl Binary {
     }
 
     pub(crate) fn pretty_str(&self, parent_precedence: Option<usize>) -> String {
+        // Special-case: multiplication of coefficient and variable
+        if self.op == BinaryOp::Mul {
+            if let (NodeInner::Const(c), NodeInner::Var(v)) = (&**self.lhs, &**self.rhs) {
+                return format!("{}{}", c, v);
+            }
+        }
+
         match self.op.parsing_precedence() {
             Some((left_assoc, prec)) => {
                 let left_needs_parens = match (self.lhs.parsing_precedence(), left_assoc) {

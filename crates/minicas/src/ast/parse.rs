@@ -70,6 +70,14 @@ fn parser(i: &str) -> IResult<&str, ParseNode> {
                     Err(())
                 },
             ),
+            map_res(
+                preceded(multispace0, delimited(tag("|"), parser, tag("|"))),
+                |n| Ok::<ParseNode<'_>, ()>(ParseNode::Abs(Box::new(n))),
+            ),
+            map_res(
+                preceded(multispace0, delimited(tag("abs("), parser, tag(")"))),
+                |n| Ok::<ParseNode<'_>, ()>(ParseNode::Abs(Box::new(n))),
+            ),
             map_res(preceded(multispace0, digit1), |s: &str| {
                 if let Ok(i) = s.parse::<i64>() {
                     return Ok(ParseNode::Int(i));
@@ -88,10 +96,6 @@ fn parser(i: &str) -> IResult<&str, ParseNode> {
                     let ident = String::from(s) + t;
                     Ok::<ParseNode<'_>, ()>(ParseNode::Ident(ident))
                 },
-            ),
-            map_res(
-                preceded(multispace0, delimited(tag("|"), parser, tag("|"))),
-                |n| Ok::<ParseNode<'_>, ()>(ParseNode::Abs(Box::new(n))),
             ),
             preceded(multispace0, delimited(tag("("), parser, tag(")"))),
         )),
@@ -141,6 +145,10 @@ fn abs() {
     assert_eq!(
         parser("|3|"),
         Ok(("", ParseNode::Abs(Box::new(ParseNode::Int(3)))))
+    );
+    assert_eq!(
+        parser("abs(2)"),
+        Ok(("", ParseNode::Abs(Box::new(ParseNode::Int(2)))))
     );
 }
 

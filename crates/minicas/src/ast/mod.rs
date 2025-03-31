@@ -13,6 +13,8 @@ mod node_unary;
 pub use node_unary::{Unary, UnaryOp};
 mod node_variable;
 pub use node_variable::Var;
+mod node_piecewise;
+pub use node_piecewise::Piecewise;
 
 mod parse;
 
@@ -333,6 +335,8 @@ pub enum NodeInner {
     Binary(Binary),
     /// Some unknown value.
     Var(Var),
+    /// A piecewise function.
+    Piecewise(Piecewise),
 }
 
 impl NodeInner {
@@ -381,6 +385,20 @@ impl NodeInner {
                 (Self::Unary(u), 0) => (*u.operand()).n.get(i),
                 (Self::Binary(b), 0) => (*b.lhs()).n.get(i),
                 (Self::Binary(b), 1) => (*b.rhs()).n.get(i),
+                (Self::Piecewise(p), idx) => {
+                    let num_branches = p.r#if.len();
+                    if idx == num_branches * 2 {
+                        p.r#else.n.get(i)
+                    } else if idx < num_branches * 2 {
+                        if idx % 2 == 1 {
+                            p.r#if[idx / 2].1.n.get(i)
+                        } else {
+                            p.r#if[idx / 2].0.n.get(i)
+                        }
+                    } else {
+                        None
+                    }
+                }
                 _ => None,
             },
             None => Some(self),
@@ -398,6 +416,20 @@ impl NodeInner {
                 (Self::Unary(u), 0) => (*u.operand_mut()).n.get_mut(i),
                 (Self::Binary(b), 0) => (*b.lhs_mut()).n.get_mut(i),
                 (Self::Binary(b), 1) => (*b.rhs_mut()).n.get_mut(i),
+                (Self::Piecewise(p), idx) => {
+                    let num_branches = p.r#if.len();
+                    if idx == num_branches * 2 {
+                        p.r#else.n.get_mut(i)
+                    } else if idx < num_branches * 2 {
+                        if idx % 2 == 1 {
+                            p.r#if[idx / 2].1.n.get_mut(i)
+                        } else {
+                            p.r#if[idx / 2].0.n.get_mut(i)
+                        }
+                    } else {
+                        None
+                    }
+                }
                 _ => None,
             },
             None => Some(self),
@@ -411,6 +443,7 @@ impl NodeInner {
             Self::Unary(u) => u.pretty_str(parent_precedence),
             Self::Binary(b) => b.pretty_str(parent_precedence),
             Self::Var(v) => format!("{}", v),
+            Self::Piecewise(p) => format!("{}", p),
         }
     }
 }
@@ -422,12 +455,15 @@ impl AstNode for NodeInner {
             Self::Unary(u) => u.returns(),
             Self::Binary(b) => b.returns(),
             Self::Var(v) => v.returns(),
+            Self::Piecewise(p) => p.returns(),
         }
     }
 
     fn descendant_types(&self) -> impl Iterator<Item = Option<Ty>> {
         match self {
-            Self::Const(_) | Self::Var(_) => [None, None].into_iter().flatten(),
+            Self::Const(_) | Self::Var(_) | Self::Piecewise(_) => {
+                [None, None].into_iter().flatten()
+            }
             Self::Unary(u) => [Some(u.operand().returns()), None].into_iter().flatten(),
             Self::Binary(b) => [Some(b.lhs().returns()), Some(b.lhs().returns())]
                 .into_iter()
@@ -439,6 +475,7 @@ impl AstNode for NodeInner {
             Self::Const(c) => Ok(c.value().clone()),
             Self::Unary(u) => u.finite_eval(ctx),
             Self::Binary(b) => b.finite_eval(ctx),
+            Self::Piecewise(p) => p.finite_eval(ctx),
             Self::Var(v) => match ctx.resolve_var(v.ident()) {
                 Some(v) => Ok(v.clone()),
                 None => Err(EvalError::UnknownIdent(v.ident().to_string())),
@@ -461,6 +498,13 @@ impl AstNode for NodeInner {
             Self::Binary(b) => {
                 b.lhs().walk(depth_first, cb);
                 b.rhs().walk(depth_first, cb);
+            }
+            Self::Piecewise(p) => {
+                for (e, p) in p.iter_branches() {
+                    e.walk(depth_first, cb);
+                    p.walk(depth_first, cb)
+                }
+                p.else_branch().walk(depth_first, cb);
             }
 
             // nothing contained to walk
@@ -489,6 +533,13 @@ impl AstNode for NodeInner {
                 b.lhs_mut().walk_mut(depth_first, cb);
                 b.rhs_mut().walk_mut(depth_first, cb);
             }
+            Self::Piecewise(p) => {
+                for (e, p) in p.iter_branches_mut() {
+                    e.walk_mut(depth_first, cb);
+                    p.walk_mut(depth_first, cb)
+                }
+                p.else_branch_mut().walk_mut(depth_first, cb);
+            }
 
             // nothing contained to walk
             Self::Const(_) | Self::Var(_) => {}
@@ -507,7 +558,9 @@ impl AstNode for NodeInner {
 
     fn iter_children(&self) -> impl Iterator<Item = &NodeInner> {
         match self {
-            Self::Const(_) | Self::Var(_) => [None, None].into_iter().flatten(),
+            Self::Const(_) | Self::Var(_) | Self::Piecewise(_) => {
+                [None, None].into_iter().flatten()
+            }
             Self::Unary(u) => [Some(&u.operand().0.n), None].into_iter().flatten(),
             Self::Binary(b) => [Some(&b.lhs().0.n), Some(&b.rhs().0.n)]
                 .into_iter()
@@ -523,7 +576,7 @@ impl AstNode for NodeInner {
     }
     fn parsing_precedence(&self) -> Option<(bool, usize)> {
         match self {
-            Self::Const(_) | Self::Var(_) => None,
+            Self::Const(_) | Self::Var(_) | Self::Piecewise(_) => None,
             Self::Unary(u) => u.op.parsing_precedence(),
             Self::Binary(b) => b.op.parsing_precedence(),
         }
@@ -548,6 +601,11 @@ impl From<Unary> for NodeInner {
 impl From<Var> for NodeInner {
     fn from(n: Var) -> Self {
         Self::Var(n)
+    }
+}
+impl From<Piecewise> for NodeInner {
+    fn from(p: Piecewise) -> Self {
+        Self::Piecewise(p)
     }
 }
 impl From<Node> for NodeInner {
@@ -730,6 +788,20 @@ mod tests {
                 )
             )
         );
+
+        assert_eq!(
+            "{2x if x == 0; otherwise x}",
+            format!(
+                "{}",
+                Node::new(NodeInner::from(Piecewise::new(
+                    vec![(
+                        Node::try_from("2x").unwrap().into(),
+                        Node::try_from("x == 0").unwrap().into(),
+                    )],
+                    Node::try_from("x").unwrap().into(),
+                )))
+            )
+        );
     }
 
     #[test]
@@ -777,6 +849,29 @@ mod tests {
         assert_eq!(
             Node::try_from("3 + 2*5").unwrap().get(vec![99].into_iter()),
             None,
+        );
+
+        // Piecewise
+        let p: Node = NodeInner::from(Piecewise::new(
+            vec![(
+                Node::try_from("x").unwrap().into(),
+                Node::try_from("x == 0").unwrap().into(),
+            )],
+            Node::try_from("0").unwrap().into(),
+        ))
+        .into();
+        assert_eq!(p.get(vec![99].into_iter()), None);
+        assert_eq!(
+            p.get(vec![0].into_iter()),
+            Some(Node::try_from("x").unwrap().as_inner()),
+        );
+        assert_eq!(
+            p.get(vec![1].into_iter()),
+            Some(Node::try_from("x == 0").unwrap().as_inner()),
+        );
+        assert_eq!(
+            p.get(vec![2].into_iter()),
+            Some(Node::try_from("0").unwrap().as_inner()),
         );
     }
 }

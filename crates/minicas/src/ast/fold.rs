@@ -19,6 +19,12 @@ pub fn fold<N: AstNode>(n: &mut N) -> Result<(), EvalError> {
                     false
                 }
             }
+            NodeInner::Piecewise(p) => {
+                p.iter_branches()
+                    .map(|e| e.0.as_const().is_some() && e.1.as_const().is_some())
+                    .all(|b| b)
+                    && p.else_branch().as_const().is_some()
+            }
 
             NodeInner::Const(_) | NodeInner::Var(_) => false,
         };
@@ -42,7 +48,7 @@ pub fn fold<N: AstNode>(n: &mut N) -> Result<(), EvalError> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ast::Node;
+    use crate::ast::{Node, Piecewise};
 
     #[test]
     fn unary() {
@@ -77,5 +83,29 @@ mod tests {
         let mut n = Node::try_from("2 + (3x / 2)").unwrap();
         assert_eq!(fold(&mut n), Ok(()),);
         assert_eq!(n, Node::try_from("2 + (3x / 2)").unwrap());
+    }
+
+    #[test]
+    fn piecewise() {
+        let mut n: Node = NodeInner::from(Piecewise::new(
+            vec![(
+                Node::try_from("x == 5").unwrap().into(),
+                Node::try_from("x == y").unwrap().into(),
+            )],
+            Node::try_from("5").unwrap().into(),
+        ))
+        .into();
+        assert_eq!(fold(&mut n), Ok(()),);
+
+        let mut n: Node = NodeInner::from(Piecewise::new(
+            vec![(
+                Node::try_from("5").unwrap().into(),
+                Node::try_from("true").unwrap().into(),
+            )],
+            Node::try_from("1").unwrap().into(),
+        ))
+        .into();
+        assert_eq!(fold(&mut n), Ok(()),);
+        assert_eq!(n, Node::try_from("5").unwrap());
     }
 }
