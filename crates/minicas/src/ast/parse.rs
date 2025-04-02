@@ -1,9 +1,10 @@
 use nom::{
     branch::alt,
     bytes::complete::tag,
-    character::complete::{alpha1, digit0, digit1, multispace0},
+    character::complete::{alpha1, digit0, digit1, multispace0, multispace1},
     combinator::{fail, map_res},
-    sequence::{delimited, preceded},
+    multi::many0,
+    sequence::{delimited, preceded, separated_pair},
     IResult,
 };
 use nom_language::precedence::precedence;
@@ -25,6 +26,10 @@ pub enum ParseNode<'a> {
         op: &'a str,
         lhs: Box<ParseNode<'a>>,
         rhs: Box<ParseNode<'a>>,
+    },
+    Piecewise {
+        arms: Vec<(Box<ParseNode<'a>>, Box<ParseNode<'a>>)>,
+        otherwise: Box<ParseNode<'a>>,
     },
 }
 
@@ -102,6 +107,37 @@ fn parser(i: &str) -> IResult<&str, ParseNode> {
                 },
             ),
             preceded(multispace0, delimited(tag("("), parser, tag(")"))),
+            map_res(
+                preceded(
+                    multispace0,
+                    delimited(
+                        tag("{"),
+                        separated_pair(
+                            many0(delimited(
+                                multispace0,
+                                separated_pair(
+                                    parser,
+                                    (multispace1, tag("if"), multispace1),
+                                    parser,
+                                ),
+                                (multispace0, tag(";")),
+                            )),
+                            (multispace0, tag("otherwise"), multispace1),
+                            parser,
+                        ),
+                        (multispace0, tag("}")),
+                    ),
+                ),
+                |(arms, otherwise): (Vec<(ParseNode, ParseNode)>, ParseNode)| {
+                    Ok::<ParseNode<'_>, ()>(ParseNode::Piecewise {
+                        arms: arms
+                            .into_iter()
+                            .map(|(e, c)| (Box::new(e), Box::new(c)))
+                            .collect(),
+                        otherwise: Box::new(otherwise),
+                    })
+                },
+            ),
         )),
         |op: Operation<&str, (), &str, ParseNode>| {
             use nom_language::precedence::Operation::*;
@@ -308,6 +344,40 @@ fn basic() {
                 op: &"==",
                 lhs: Box::new(ParseNode::Int(4)),
                 rhs: Box::new(ParseNode::Int(3)),
+            }
+        ))
+    );
+}
+
+#[test]
+fn piecewise() {
+    assert_eq!(
+        parser("{-1 if x < 0; 1 if x > 0; otherwise 0}"),
+        Ok((
+            "",
+            ParseNode::Piecewise {
+                arms: vec![
+                    (
+                        Box::new(ParseNode::Unary {
+                            op: &"-",
+                            operand: Box::new(ParseNode::Int(1)),
+                        }),
+                        Box::new(ParseNode::Binary {
+                            op: &"<",
+                            lhs: Box::new(ParseNode::Ident("x".into())),
+                            rhs: Box::new(ParseNode::Int(0)),
+                        }),
+                    ),
+                    (
+                        Box::new(ParseNode::Int(1)),
+                        Box::new(ParseNode::Binary {
+                            op: &">",
+                            lhs: Box::new(ParseNode::Ident("x".into())),
+                            rhs: Box::new(ParseNode::Int(0)),
+                        }),
+                    ),
+                ],
+                otherwise: Box::new(ParseNode::Int(0)),
             }
         ))
     );

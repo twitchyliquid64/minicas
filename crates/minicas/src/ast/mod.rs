@@ -199,6 +199,16 @@ impl<'a> TryFrom<parse::ParseNode<'a>> for Node {
                     _ => Err(format!("unknown binary op {}", op)),
                 }
             }
+            ParseNode::Piecewise { arms, otherwise } => {
+                let otherwise = Node::try_from(*otherwise)?;
+                Ok(NodeInner::from(Piecewise::new(
+                    arms.into_iter()
+                        .map(|(e, c)| Ok((Node::try_from(*e)?.into(), Node::try_from(*c)?.into())))
+                        .collect::<Result<Vec<_>, String>>()?,
+                    otherwise.into(),
+                ))
+                .into())
+            }
         }
     }
 }
@@ -671,6 +681,20 @@ mod tests {
                 )
                 .into()
             )),
+        );
+    }
+
+    #[test]
+    fn parse_piecewise() {
+        assert_eq!(
+            Node::try_from("{2x if x == 0; otherwise x}"),
+            Ok(Node::new(NodeInner::from(Piecewise::new(
+                vec![(
+                    Node::try_from("2x").unwrap().into(),
+                    Node::try_from("x == 0").unwrap().into(),
+                )],
+                Node::try_from("x").unwrap().into(),
+            )))),
         );
     }
 
