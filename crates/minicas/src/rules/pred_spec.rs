@@ -27,13 +27,18 @@ pub struct PredSpec {
     #[serde(alias = "operand")]
     pub lhs: Option<Box<PredSpec>>,
     pub rhs: Option<Box<PredSpec>>,
+
+    #[serde(alias = "num_arms")]
+    pub arity: Option<usize>,
+
+    pub children: Option<Vec<PredSpec>>,
 }
 
 impl TryInto<Predicate> for PredSpec {
     type Error = String;
 
     fn try_into(self) -> Result<Predicate, Self::Error> {
-        let children = match (self.lhs, self.rhs) {
+        let mut children = match (self.lhs, self.rhs) {
             (Some(lhs), None) => vec![Some((*lhs).try_into().map_err(|e| format!("lhs: {}", e))?)],
             (Some(lhs), Some(rhs)) => vec![
                 Some((*lhs).try_into().map_err(|e| format!("lhs: {}", e))?),
@@ -45,6 +50,19 @@ impl TryInto<Predicate> for PredSpec {
             ],
             (None, None) => vec![],
         };
+        if children.len() > 0 && self.children.is_some() {
+            return Err("both lhs/rhs/operand and children[] specified".into());
+        }
+        if let Some(c) = self.children {
+            children = c
+                .into_iter()
+                .enumerate()
+                .map(|(i, p)| match p.try_into() {
+                    Ok(p) => Ok(Some(p)),
+                    Err(e) => Err(format!("children.{}: {}", i, e)),
+                })
+                .collect::<Result<Vec<Option<Predicate>>, Self::Error>>()?;
+        }
 
         let equivalent = self
             .equal
@@ -84,6 +102,7 @@ impl TryInto<Predicate> for PredSpec {
                 },
                 None => None,
             },
+            arity: self.arity,
             equivalent,
             children,
             ..Predicate::default()

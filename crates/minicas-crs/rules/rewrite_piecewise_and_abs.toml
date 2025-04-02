@@ -1,0 +1,120 @@
+[piecewise-abs-lt-as-unary-abs]
+match.op = 'piecewise'
+match.num_arms = 2
+match.children = [
+	# arm 1, body (negated argument)
+	{op = 'neg'},
+	# arm 1, conditional
+	{op = '<', rhs = {const = '0'}},
+	# arm 2, else case
+	{},
+]
+match.equal = [
+	# what is negated is the lhs of the conditional
+	{l = [0, 0], r = [1, 0]},
+	# the optional is the same argument as the first arm
+	{l = [0, 0], r = [2]},
+]
+tests = [
+    {from = '{-x if x < 0; otherwise x}', to = 'abs(x)'},
+    {from = '{-(x*x) if (x*x) < 0; otherwise (x*x)}', to = 'abs(x*x)'},
+]
+
+[piecewise-abs-lt-as-unary-abs.rewrite]
+base = "abs(1)"
+replace = [
+    [[0, 0], [0]],
+]
+
+[piecewise-abs-lte-as-unary-abs]
+match.op = 'piecewise'
+match.num_arms = 2
+match.children = [
+	# arm 1, body (negated argument)
+	{op = 'neg'},
+	# arm 1, conditional
+	{op = '<=', rhs = {const = '0'}},
+	# arm 2, else case
+	{},
+]
+match.equal = [
+	# what is negated is the lhs of the conditional
+	{l = [0, 0], r = [1, 0]},
+	# the optional is the same argument as the first arm
+	{l = [0, 0], r = [2]},
+]
+tests = [
+    {from = '{-x if x <= 0; otherwise x}', to = 'abs(x)'},
+    {from = '{-(x*x) if (x*x) <= 0; otherwise (x*x)}', to = 'abs(x*x)'},
+]
+
+[piecewise-abs-lte-as-unary-abs.rewrite]
+base = "abs(1)"
+replace = [
+    [[0, 0], [0]],
+]
+
+[piecewise-abs-gt-as-unary-abs]
+match.op = 'piecewise'
+match.num_arms = 2
+match.children = [
+	# arm 1, body
+	{},
+	# arm 1, conditional
+	{op = '>', rhs = {const = '0'}},
+	# arm 2, else case (negated argument)
+	{op = 'neg'},
+]
+match.equal = [
+	{l = [0], r = [1, 0]},
+	{l = [0], r = [2, 0]},
+]
+tests = [
+    {from = '{x if x > 0; otherwise -x}', to = 'abs(x)'},
+    {from = '{(x*x) if (x*x) > 0; otherwise -(x*x)}', to = 'abs(x*x)'},
+]
+
+[piecewise-abs-gt-as-unary-abs.rewrite]
+base = "abs(1)"
+replace = [
+    [[0], [0]],
+]
+
+[piecewise-abs-gte-as-unary-abs]
+match.op = 'piecewise'
+match.num_arms = 2
+match.children = [
+	# arm 1, body
+	{},
+	# arm 1, conditional
+	{op = '>=', rhs = {const = '0'}},
+	# arm 2, else case (negated argument)
+	{op = 'neg'},
+]
+match.equal = [
+	{l = [0], r = [1, 0]},
+	{l = [0], r = [2, 0]},
+]
+tests = [
+    {from = '{x if x >= 0; otherwise -x}', to = 'abs(x)'},
+    {from = '{(x*x) if (x*x) >= 0; otherwise -(x*x)}', to = 'abs(x*x)'},
+]
+
+[piecewise-abs-gte-as-unary-abs.rewrite]
+base = "abs(1)"
+replace = [
+    [[0], [0]],
+]
+
+[unary-abs-to-piecewise]
+match.op = 'abs'
+tests = [
+    {from = '|x|', to = '{-x if x < 0; otherwise x}'},
+]
+[unary-abs-to-piecewise.rewrite]
+base = "{-0 if 0 < 0; otherwise 0}"
+replace = [
+    [[0], [0, 0]],
+    [[0], [1, 0]],
+    [[0], [2]],
+]

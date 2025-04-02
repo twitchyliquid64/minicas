@@ -49,10 +49,10 @@ fn parser(i: &str) -> IResult<&str, ParseNode> {
                 binary_op(3, Assoc::Left, tag("+")),
                 binary_op(3, Assoc::Left, tag("-")),
                 binary_op(4, Assoc::Left, tag("==")),
-                binary_op(4, Assoc::Left, tag(">")),
                 binary_op(4, Assoc::Left, tag(">=")),
-                binary_op(4, Assoc::Left, tag("<")),
+                binary_op(4, Assoc::Left, tag(">")),
                 binary_op(4, Assoc::Left, tag("<=")),
+                binary_op(4, Assoc::Left, tag("<")),
             )),
         ),
         alt((

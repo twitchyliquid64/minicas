@@ -1,5 +1,5 @@
 //! Predicate rules/matching for AST nodes.
-use crate::ast::{AstNode, BinaryOp, NodeInner, UnaryOp};
+use crate::ast::{AstNode, BinaryOp, CmpOp, NodeInner, UnaryOp};
 use crate::{Path, TyValue};
 
 /// Describes a predicate on the operation.
@@ -41,6 +41,11 @@ impl TryFrom<&str> for PredicateOp {
             "+" => Ok(Self::Binary(BinaryOp::Add)),
             "/" => Ok(Self::Binary(BinaryOp::Div)),
             "*" => Ok(Self::Binary(BinaryOp::Mul)),
+            "==" => Ok(Self::Binary(BinaryOp::Cmp(CmpOp::Equals))),
+            "<" => Ok(Self::Binary(BinaryOp::Cmp(CmpOp::LessThan(false)))),
+            "<=" => Ok(Self::Binary(BinaryOp::Cmp(CmpOp::LessThan(true)))),
+            ">" => Ok(Self::Binary(BinaryOp::Cmp(CmpOp::GreaterThan(false)))),
+            ">=" => Ok(Self::Binary(BinaryOp::Cmp(CmpOp::GreaterThan(true)))),
             _ => Err(()),
         }
     }
@@ -59,6 +64,11 @@ pub struct Predicate {
 
     /// Match if the descendant nodes specified by the two paths are equal.
     pub equivalent: Vec<(Path, Path)>,
+
+    /// Match if the descendant nodes have a certain number of children.
+    ///
+    /// For piecewise functions, this describes the number of conditional arms.
+    pub arity: Option<usize>,
 
     /// Match only on nodes whos children match the given predicates respectively.
     ///
@@ -103,6 +113,19 @@ impl Predicate {
                 }
             }
             (Some(_), _) => {
+                return false;
+            }
+        }
+        if let Some(arity) = self.arity {
+            if !match (arity, n.as_inner()) {
+                (0, NodeInner::Const(_) | NodeInner::Var(_)) => true,
+                (_, NodeInner::Const(_) | NodeInner::Var(_)) => false,
+                (2, NodeInner::Binary(_)) => true,
+                (_, NodeInner::Binary(_)) => false,
+                (1, NodeInner::Unary(_)) => true,
+                (_, NodeInner::Unary(_)) => false,
+                (a, NodeInner::Piecewise(p)) => a == 2 * p.iter_branches().count(),
+            } {
                 return false;
             }
         }
@@ -156,7 +179,7 @@ impl Predicate {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ast::{CmpOp, Node};
+    use crate::ast::Node;
 
     #[test]
     fn predicate_op_matches() {
