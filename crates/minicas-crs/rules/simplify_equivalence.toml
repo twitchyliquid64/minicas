@@ -121,3 +121,14 @@ base = "1/2"
 replace = [
     [[1, 1], [1]],
 ]
+
+[div-of-pow-2]
+meta = {is_simplify = true}
+match.op = '/'
+match.lhs = {op = 'pow', rhs = {const = '2'}}
+match.equal = [{l = [0, 0], r = [1]}]
+replace.from = [1]
+replace.to = []
+tests = [
+    {from = 'pow(a, 2) / a', to = 'a'},
+]

@@ -27,6 +27,8 @@ pub enum BinaryOp {
     Div,
     /// Some kind of comparison
     Cmp(CmpOp),
+    /// Power-of some integer
+    Pow,
 }
 
 impl BinaryOp {
@@ -37,6 +39,8 @@ impl BinaryOp {
         match (self, lhs, rhs) {
             (Add | Sub | Mul | Div, Some(Rational) | None, Some(Rational) | None) => true,
             (Add | Sub | Mul | Div, _, _) => false,
+            (Pow, Some(Rational) | None, Some(Rational) | None) => true,
+            (Pow, _, _) => false,
             (Cmp(CmpOp::Equals), Some(Rational) | None, Some(Rational) | None) => true,
             (Cmp(CmpOp::Equals), Some(Bool) | None, Some(Bool) | None) => true,
             (Cmp(CmpOp::Equals), _, _) => false,
@@ -57,6 +61,7 @@ impl BinaryOp {
             Sub => Some((true, 2)),
             Mul => Some((true, 3)),
             Div => Some((true, 3)),
+            Pow => None,
             Cmp(CmpOp::Equals) => Some((true, 4)),
             Cmp(CmpOp::LessThan(_)) => Some((true, 4)),
             Cmp(CmpOp::GreaterThan(_)) => Some((true, 4)),
@@ -90,6 +95,7 @@ impl fmt::Display for BinaryOp {
             Sub => write!(f, "-"),
             Mul => write!(f, "*"),
             Div => write!(f, "/"),
+            Pow => write!(f, "pow"),
             Cmp(CmpOp::Equals) => write!(f, "=="),
             Cmp(CmpOp::LessThan(false)) => write!(f, "<"),
             Cmp(CmpOp::LessThan(true)) => write!(f, "<="),
@@ -148,6 +154,14 @@ impl Binary {
             rhs: rhs.into(),
         }
     }
+    /// Constructs a new power-of node.
+    pub fn pow<V1: Into<HN>, V2: Into<HN>>(lhs: V1, rhs: V2) -> Self {
+        Self {
+            op: BinaryOp::Pow,
+            lhs: lhs.into(),
+            rhs: rhs.into(),
+        }
+    }
     /// Constructs a new equals node.
     pub fn equals<V1: Into<HN>, V2: Into<HN>>(lhs: V1, rhs: V2) -> Self {
         Self {
@@ -197,6 +211,7 @@ impl Binary {
             Sub => self.lhs.returns(),
             Mul => self.lhs.returns(),
             Div => self.lhs.returns(),
+            Pow => self.lhs.returns(),
             Cmp(CmpOp::Equals) => Some(Ty::Bool),
             Cmp(CmpOp::LessThan(_)) => Some(Ty::Bool),
             Cmp(CmpOp::GreaterThan(_)) => Some(Ty::Bool),
@@ -246,6 +261,17 @@ impl Binary {
                     Some(o) => Ok(TyValue::Rational(o)),
                     None => Err(EvalError::DivByZero),
                 },
+                (lv, rv) => Err(EvalError::UnexpectedType(vec![lv.ty(), rv.ty()])),
+            },
+            Pow => match (self.lhs.finite_eval(c)?, self.rhs.finite_eval(c)?) {
+                (TyValue::Rational(l), TyValue::Rational(r)) => {
+                    if r.is_integer() {
+                        use num::traits::Pow;
+                        Ok(TyValue::Rational(l.pow(r.numer())))
+                    } else {
+                        Err(EvalError::PowNonInteger)
+                    }
+                }
                 (lv, rv) => Err(EvalError::UnexpectedType(vec![lv.ty(), rv.ty()])),
             },
 
@@ -325,9 +351,9 @@ impl Binary {
                 tmp
             }
             None => format!(
-                "{} {} {}",
-                self.lhs.pretty_str(None),
+                "{}({}, {})",
                 self.op,
+                self.lhs.pretty_str(None),
                 self.rhs.pretty_str(None)
             ),
         }
@@ -416,6 +442,14 @@ mod tests {
         assert_eq!(
             Binary::gte::<TyValue, TyValue>(2usize.into(), 2usize.into()).finite_eval(&()),
             Ok(true.into())
+        );
+    }
+
+    #[test]
+    fn pow_finite_eval() {
+        assert_eq!(
+            Binary::pow::<TyValue, TyValue>(2usize.into(), 3usize.into()).finite_eval(&()),
+            Ok(8.into())
         );
     }
 }

@@ -68,4 +68,11 @@ fn test_simplify_rules() {
     let mut n = Node::try_from("3 * 5x").unwrap();
     simplify(&mut n, true).unwrap();
     assert_eq!(n, Node::try_from("15x").unwrap());
+
+    let mut n = Node::try_from("5x -- 2x").unwrap();
+    simplify(&mut n, true).unwrap();
+    assert_eq!(n, Node::try_from("7x").unwrap());
+    let mut n = Node::try_from("5x * 2x").unwrap();
+    simplify(&mut n, true).unwrap();
+    assert_eq!(n, Node::try_from("10 * pow(x, 2)").unwrap());
 }

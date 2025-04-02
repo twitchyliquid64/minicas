@@ -81,6 +81,15 @@ replace.to = [0]
 tests = [
 	{from = '|-a|', to = '|a|'},
 ]
+[elim-abs-of-abs]
+meta = {is_simplify = true}
+match.op = 'abs'
+match.lhs = {op = 'abs'}
+replace.from = [0]
+replace.to = []
+tests = [
+	{from = '||2x||', to = '|2x|'},
+]
 
 [div-with-two-negations]
 meta = {is_simplify = true}
@@ -235,4 +244,38 @@ replace.from = [0]
 replace.to = []
 tests = [
 	{from = 'a - 0', to = 'a'},
+]
+
+[elim-pow-1]
+meta = {is_simplify = true}
+match.op = 'pow'
+match.rhs = {const = '1'}
+replace.from = [0]
+replace.to = []
+tests = [
+    {from = 'pow(a, 1)', to = 'a'},
+]
+
+[elim-pow-0]
+meta = {is_simplify = true}
+match.op = 'pow'
+match.rhs = {const = '0'}
+tests = [
+    {from = 'pow(a, 0)', to = '1'},
+]
+[elim-pow-0.rewrite]
+base = "1"
+replace = []
+
+[elim-pow-neg-1]
+meta = {is_simplify = true}
+match.op = 'pow'
+match.rhs = {op = 'neg', operand = {const = '1'}}
+tests = [
+    {from = 'pow(a, -1)', to = '1/a'},
+]
+[elim-pow-neg-1.rewrite]
+base = "1 / 2"
+replace = [
+	[[0], [1]],
 ]

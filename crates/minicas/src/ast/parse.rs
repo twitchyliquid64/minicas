@@ -22,6 +22,7 @@ pub enum ParseNode<'a> {
         operand: Box<ParseNode<'a>>,
     },
     Abs(Box<ParseNode<'a>>),
+    Pow(Box<ParseNode<'a>>, Box<ParseNode<'a>>),
     Binary {
         op: &'a str,
         lhs: Box<ParseNode<'a>>,
@@ -86,6 +87,19 @@ fn parser(i: &str) -> IResult<&str, ParseNode> {
             map_res(
                 preceded(multispace0, delimited(tag("abs("), parser, tag(")"))),
                 |n| Ok::<ParseNode<'_>, ()>(ParseNode::Abs(Box::new(n))),
+            ),
+            map_res(
+                preceded(
+                    multispace0,
+                    delimited(
+                        tag("pow("),
+                        separated_pair(parser, (multispace0, tag(",")), parser),
+                        tag(")"),
+                    ),
+                ),
+                |(l, r): (ParseNode, ParseNode)| {
+                    Ok::<ParseNode<'_>, ()>(ParseNode::Pow(Box::new(l), Box::new(r)))
+                },
             ),
             map_res(preceded(multispace0, digit1), |s: &str| {
                 if let Ok(i) = s.parse::<i64>() {
