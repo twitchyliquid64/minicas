@@ -192,6 +192,10 @@ impl<'a> TryFrom<parse::ParseNode<'a>> for Node {
                     "*" => Ok(NodeInner::Binary(Binary::mul(l, r)).into()),
                     "/" => Ok(NodeInner::Binary(Binary::div(l, r)).into()),
                     "==" => Ok(NodeInner::Binary(Binary::equals(l, r)).into()),
+                    "<" => Ok(NodeInner::Binary(Binary::lt(l, r)).into()),
+                    "<=" => Ok(NodeInner::Binary(Binary::lte(l, r)).into()),
+                    ">" => Ok(NodeInner::Binary(Binary::gt(l, r)).into()),
+                    ">=" => Ok(NodeInner::Binary(Binary::gte(l, r)).into()),
                     _ => Err(format!("unknown binary op {}", op)),
                 }
             }
@@ -650,6 +654,12 @@ mod tests {
             Node::try_from("3==5"),
             Ok(Node::new(
                 Binary::equals::<TyValue, TyValue>(3.into(), 5.into()).into()
+            )),
+        );
+        assert_eq!(
+            Node::try_from("3 > 5"),
+            Ok(Node::new(
+                Binary::gt::<TyValue, TyValue>(3.into(), 5.into()).into()
             )),
         );
         assert_eq!(

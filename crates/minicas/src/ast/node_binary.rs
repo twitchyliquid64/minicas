@@ -4,9 +4,14 @@ use num::CheckedDiv;
 use std::fmt;
 
 /// CmpOp enumerations binary operations which compare values.
+///
+/// A contained bool indicates if the comparison is inclusive:
+/// i.e. `LessThan(true)` means less than or equal.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum CmpOp {
     Equals,
+    LessThan(bool),
+    GreaterThan(bool),
 }
 
 /// BinaryOp enumerates the types of binary operations.
@@ -35,6 +40,10 @@ impl BinaryOp {
             (Cmp(CmpOp::Equals), Some(Rational) | None, Some(Rational) | None) => true,
             (Cmp(CmpOp::Equals), Some(Bool) | None, Some(Bool) | None) => true,
             (Cmp(CmpOp::Equals), _, _) => false,
+            (Cmp(CmpOp::LessThan(_)), Some(Rational) | None, Some(Rational) | None) => true,
+            (Cmp(CmpOp::LessThan(_)), _, _) => false,
+            (Cmp(CmpOp::GreaterThan(_)), Some(Rational) | None, Some(Rational) | None) => true,
+            (Cmp(CmpOp::GreaterThan(_)), _, _) => false,
         }
     }
 
@@ -49,6 +58,8 @@ impl BinaryOp {
             Mul => Some((true, 3)),
             Div => Some((true, 3)),
             Cmp(CmpOp::Equals) => Some((true, 4)),
+            Cmp(CmpOp::LessThan(_)) => Some((true, 4)),
+            Cmp(CmpOp::GreaterThan(_)) => Some((true, 4)),
         }
     }
 
@@ -80,6 +91,10 @@ impl fmt::Display for BinaryOp {
             Mul => write!(f, "*"),
             Div => write!(f, "/"),
             Cmp(CmpOp::Equals) => write!(f, "=="),
+            Cmp(CmpOp::LessThan(false)) => write!(f, "<"),
+            Cmp(CmpOp::LessThan(true)) => write!(f, "<="),
+            Cmp(CmpOp::GreaterThan(false)) => write!(f, ">"),
+            Cmp(CmpOp::GreaterThan(true)) => write!(f, ">="),
         }
     }
 }
@@ -141,6 +156,38 @@ impl Binary {
             rhs: rhs.into(),
         }
     }
+    /// Constructs a new less-than node.
+    pub fn lt<V1: Into<HN>, V2: Into<HN>>(lhs: V1, rhs: V2) -> Self {
+        Self {
+            op: BinaryOp::Cmp(CmpOp::LessThan(false)),
+            lhs: lhs.into(),
+            rhs: rhs.into(),
+        }
+    }
+    /// Constructs a new less-than-or-equal node.
+    pub fn lte<V1: Into<HN>, V2: Into<HN>>(lhs: V1, rhs: V2) -> Self {
+        Self {
+            op: BinaryOp::Cmp(CmpOp::LessThan(true)),
+            lhs: lhs.into(),
+            rhs: rhs.into(),
+        }
+    }
+    /// Constructs a new greater-than node.
+    pub fn gt<V1: Into<HN>, V2: Into<HN>>(lhs: V1, rhs: V2) -> Self {
+        Self {
+            op: BinaryOp::Cmp(CmpOp::GreaterThan(false)),
+            lhs: lhs.into(),
+            rhs: rhs.into(),
+        }
+    }
+    /// Constructs a new greater-than-or-equal node.
+    pub fn gte<V1: Into<HN>, V2: Into<HN>>(lhs: V1, rhs: V2) -> Self {
+        Self {
+            op: BinaryOp::Cmp(CmpOp::GreaterThan(true)),
+            lhs: lhs.into(),
+            rhs: rhs.into(),
+        }
+    }
 
     /// Returns the type of the value execution yields.
     pub fn returns(&self) -> Option<Ty> {
@@ -151,6 +198,8 @@ impl Binary {
             Mul => self.lhs.returns(),
             Div => self.lhs.returns(),
             Cmp(CmpOp::Equals) => Some(Ty::Bool),
+            Cmp(CmpOp::LessThan(_)) => Some(Ty::Bool),
+            Cmp(CmpOp::GreaterThan(_)) => Some(Ty::Bool),
         }
     }
 
@@ -199,11 +248,36 @@ impl Binary {
                 },
                 (lv, rv) => Err(EvalError::UnexpectedType(vec![lv.ty(), rv.ty()])),
             },
+
             Cmp(CmpOp::Equals) => match (self.lhs.finite_eval(c)?, self.rhs.finite_eval(c)?) {
                 (TyValue::Rational(l), TyValue::Rational(r)) => Ok(TyValue::Bool(l == r)),
                 (TyValue::Bool(l), TyValue::Bool(r)) => Ok(TyValue::Bool(l == r)),
                 (lv, rv) => Err(EvalError::UnexpectedType(vec![lv.ty(), rv.ty()])),
             },
+            Cmp(CmpOp::LessThan(false)) => {
+                match (self.lhs.finite_eval(c)?, self.rhs.finite_eval(c)?) {
+                    (TyValue::Rational(l), TyValue::Rational(r)) => Ok(TyValue::Bool(l < r)),
+                    (lv, rv) => Err(EvalError::UnexpectedType(vec![lv.ty(), rv.ty()])),
+                }
+            }
+            Cmp(CmpOp::LessThan(true)) => {
+                match (self.lhs.finite_eval(c)?, self.rhs.finite_eval(c)?) {
+                    (TyValue::Rational(l), TyValue::Rational(r)) => Ok(TyValue::Bool(l <= r)),
+                    (lv, rv) => Err(EvalError::UnexpectedType(vec![lv.ty(), rv.ty()])),
+                }
+            }
+            Cmp(CmpOp::GreaterThan(false)) => {
+                match (self.lhs.finite_eval(c)?, self.rhs.finite_eval(c)?) {
+                    (TyValue::Rational(l), TyValue::Rational(r)) => Ok(TyValue::Bool(l > r)),
+                    (lv, rv) => Err(EvalError::UnexpectedType(vec![lv.ty(), rv.ty()])),
+                }
+            }
+            Cmp(CmpOp::GreaterThan(true)) => {
+                match (self.lhs.finite_eval(c)?, self.rhs.finite_eval(c)?) {
+                    (TyValue::Rational(l), TyValue::Rational(r)) => Ok(TyValue::Bool(l >= r)),
+                    (lv, rv) => Err(EvalError::UnexpectedType(vec![lv.ty(), rv.ty()])),
+                }
+            }
         }
     }
 
@@ -302,6 +376,7 @@ mod tests {
             Err(EvalError::DivByZero)
         );
     }
+
     #[test]
     fn eq_finite_eval() {
         assert_eq!(
@@ -310,6 +385,36 @@ mod tests {
         );
         assert_eq!(
             Binary::equals::<TyValue, TyValue>(2usize.into(), 2usize.into()).finite_eval(&()),
+            Ok(true.into())
+        );
+    }
+    #[test]
+    fn lt_finite_eval() {
+        assert_eq!(
+            Binary::lt::<TyValue, TyValue>(2usize.into(), 3usize.into()).finite_eval(&()),
+            Ok(true.into())
+        );
+        assert_eq!(
+            Binary::lt::<TyValue, TyValue>(2usize.into(), 2usize.into()).finite_eval(&()),
+            Ok(false.into())
+        );
+        assert_eq!(
+            Binary::lte::<TyValue, TyValue>(2usize.into(), 2usize.into()).finite_eval(&()),
+            Ok(true.into())
+        );
+    }
+    #[test]
+    fn gt_finite_eval() {
+        assert_eq!(
+            Binary::gt::<TyValue, TyValue>(3usize.into(), 2usize.into()).finite_eval(&()),
+            Ok(true.into())
+        );
+        assert_eq!(
+            Binary::gt::<TyValue, TyValue>(2usize.into(), 2usize.into()).finite_eval(&()),
+            Ok(false.into())
+        );
+        assert_eq!(
+            Binary::gte::<TyValue, TyValue>(2usize.into(), 2usize.into()).finite_eval(&()),
             Ok(true.into())
         );
     }
