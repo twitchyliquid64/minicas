@@ -35,6 +35,12 @@ impl Into<Vec<usize>> for Path {
 }
 
 impl Path {
+    pub fn with_next(u: usize) -> Self {
+        let mut out = Self::default();
+        out.push(u);
+        out
+    }
+
     pub fn push(&mut self, u: usize) {
         match self {
             Self::Opt(v, cnt) => match stuffed_val_push(*v, u) {

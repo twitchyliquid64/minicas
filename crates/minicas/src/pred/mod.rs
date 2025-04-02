@@ -7,6 +7,7 @@ use crate::{Path, TyValue};
 pub enum PredicateOp {
     Unary(UnaryOp),
     Binary(BinaryOp),
+    Piecewise,
     Const,
     Var,
 }
@@ -17,6 +18,7 @@ impl PredicateOp {
         match (self, n.as_inner()) {
             (Self::Unary(po), NodeInner::Unary(n)) => po.eq(&n.op),
             (Self::Binary(po), NodeInner::Binary(n)) => po.eq(&n.op),
+            (Self::Piecewise, NodeInner::Piecewise(_)) => true,
             (Self::Const, NodeInner::Const(_)) => true,
             (Self::Var, NodeInner::Var(_)) => true,
             _ => false,
@@ -31,6 +33,7 @@ impl TryFrom<&str> for PredicateOp {
         match s {
             "const" => Ok(Self::Const),
             "var" => Ok(Self::Var),
+            "piecewise" => Ok(Self::Piecewise),
 
             "neg" => Ok(Self::Unary(UnaryOp::Negate)),
             "abs" => Ok(Self::Unary(UnaryOp::Abs)),
@@ -116,14 +119,33 @@ impl Predicate {
         }
 
         if self.children.len() > 0 {
-            if !self.children.iter().zip(n.iter_children()).all(|(pc, c)| {
-                if let Some(pc) = pc {
-                    pc.matches(c)
-                } else {
-                    true
+            // TODO: piecewise shouldnt be special-cased, but supported via
+            // iter_children() path.
+            if let NodeInner::Piecewise(_) = n.as_inner() {
+                let all_meets = self.children.iter().enumerate().all(|(i, pc)| {
+                    if let Some(pc) = pc {
+                        if let Some(c) = n.get(Path::with_next(i).iter()) {
+                            pc.matches(c)
+                        } else {
+                            false
+                        }
+                    } else {
+                        true
+                    }
+                });
+                if !all_meets {
+                    return false;
                 }
-            }) {
-                return false;
+            } else {
+                if !self.children.iter().zip(n.iter_children()).all(|(pc, c)| {
+                    if let Some(pc) = pc {
+                        pc.matches(c)
+                    } else {
+                        true
+                    }
+                }) {
+                    return false;
+                }
             }
         }
 
@@ -134,7 +156,7 @@ impl Predicate {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ast::Node;
+    use crate::ast::{CmpOp, Node};
 
     #[test]
     fn predicate_op_matches() {
@@ -161,6 +183,10 @@ mod tests {
         );
         assert_eq!(
             PredicateOp::Const.matches(&Node::try_from("5").unwrap()),
+            true,
+        );
+        assert_eq!(
+            PredicateOp::Piecewise.matches(&Node::try_from("{otherwise 5}").unwrap()),
             true,
         );
     }
@@ -270,6 +296,30 @@ mod tests {
                 ..Default::default()
             }
             .matches(&Node::try_from("-3 + 5").unwrap()),
+            true,
+        );
+
+        // Test matching piecewise function arms / else case
+        assert_eq!(
+            Predicate {
+                children: vec![Some(Predicate::op(PredicateOp::Unary(UnaryOp::Negate)))],
+                ..Default::default()
+            }
+            .matches(&Node::try_from("{otherwise -2}").unwrap()),
+            true,
+        );
+        assert_eq!(
+            Predicate {
+                children: vec![
+                    Some(Predicate::op(PredicateOp::Const)),
+                    Some(Predicate::op(PredicateOp::Binary(BinaryOp::Cmp(
+                        CmpOp::LessThan(false)
+                    )))),
+                    Some(Predicate::op(PredicateOp::Unary(UnaryOp::Negate))),
+                ],
+                ..Default::default()
+            }
+            .matches(&Node::try_from("{1 if x < 0; otherwise -2}").unwrap()),
             true,
         );
 
