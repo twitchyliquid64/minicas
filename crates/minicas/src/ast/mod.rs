@@ -44,6 +44,17 @@ impl EvalContext for () {
     }
 }
 
+impl<S: AsRef<str>> EvalContext for Vec<(S, TyValue)> {
+    fn resolve_var(&self, id: &str) -> Option<&TyValue> {
+        for (ident, val) in self {
+            if ident.as_ref() == id {
+                return Some(val);
+            }
+        }
+        None
+    }
+}
+
 pub trait AstNode: Clone + Sized + std::fmt::Debug {
     /// Returns the type of the value this node yields.
     fn returns(&self) -> Option<Ty>;
@@ -856,6 +867,28 @@ mod tests {
         assert_eq!(
             Node::try_from("x").unwrap().finite_eval(&()),
             Err(EvalError::UnknownIdent("x".to_string()))
+        );
+        assert_eq!(
+            Node::try_from("x")
+                .unwrap()
+                .finite_eval(&vec![("x", 69.into())]),
+            Ok(69.into()),
+        );
+    }
+
+    #[test]
+    fn finite_eval_piecewise() {
+        assert_eq!(
+            Node::try_from("{x if x > y; otherwise y}")
+                .unwrap()
+                .finite_eval(&vec![("x", 42.into()), ("y", 4.into())]),
+            Ok(42.into()),
+        );
+        assert_eq!(
+            Node::try_from("{x if x > y; otherwise y}")
+                .unwrap()
+                .finite_eval(&vec![("x", 1.into()), ("y", 4.into())]),
+            Ok(4.into()),
         );
     }
 
