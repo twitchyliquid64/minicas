@@ -117,6 +117,11 @@ impl RuleActionSpec {
 pub struct MetaSpec {
     #[serde(default)]
     pub is_simplify: bool,
+    #[serde(default)]
+    /// Indicates that the rule describes an equivalence that isn't
+    /// necessarily a simplification, but might be a relevant form
+    /// for algebraic transformations.
+    pub alt_form: bool,
 }
 
 /// Describes how a rule is specified in a rule file.

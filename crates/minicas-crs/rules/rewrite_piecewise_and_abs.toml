@@ -1,4 +1,5 @@
 [piecewise-abs-lt-as-unary-abs]
+meta.alt_form = true
 match.op = 'piecewise'
 match.num_arms = 2
 match.children = [
@@ -27,6 +28,7 @@ replace = [
 ]
 
 [piecewise-abs-lte-as-unary-abs]
+meta.alt_form = true
 match.op = 'piecewise'
 match.num_arms = 2
 match.children = [
@@ -55,6 +57,7 @@ replace = [
 ]
 
 [piecewise-abs-gt-as-unary-abs]
+meta.alt_form = true
 match.op = 'piecewise'
 match.num_arms = 2
 match.children = [
@@ -81,6 +84,7 @@ replace = [
 ]
 
 [piecewise-abs-gte-as-unary-abs]
+meta.alt_form = true
 match.op = 'piecewise'
 match.num_arms = 2
 match.children = [
@@ -107,6 +111,7 @@ replace = [
 ]
 
 [unary-abs-to-piecewise]
+meta.alt_form = true
 match.op = 'abs'
 tests = [
     {from = '|x|', to = '{-x if x < 0; otherwise x}'},
