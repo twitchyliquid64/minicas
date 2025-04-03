@@ -1,3 +1,4 @@
+//! Implements constant folding/propagation of an AST.
 use crate::ast::{AstNode, Binary, EvalError, NodeInner, Unary};
 
 /// Performs constant folding on an AST.

@@ -24,6 +24,8 @@ mod fold;
 pub use fold::fold;
 mod typecheck;
 pub use typecheck::{typecheck, TypeError};
+mod rearrange;
+pub use rearrange::make_subject;
 
 /// Errors that can occur when evaluating an AST.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

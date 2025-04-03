@@ -1,3 +1,4 @@
+//! Implements typechecking of an AST.
 use crate::ast::{AstNode, Binary, BinaryOp, NodeInner, Unary, UnaryOp};
 use crate::Ty;
 
