@@ -88,7 +88,7 @@ impl Iterator for PathIter<'_> {
                     } else if (possible & 0b11) == 0b11 {
                         todo!("support longer formats")
                     } else {
-                        Some(((possible >> 1) & 0b1) as usize)
+                        Some(((possible >> 1) & 0b11) as usize)
                     }
                 }
             }
@@ -114,7 +114,7 @@ fn stuffed_val_push(v: u64, n: usize) -> Result<u64, ()> {
     if stuffed_val_full(&v) {
         return Err(());
     }
-    if n > 1 {
+    if n > 3 {
         return Err(());
     }
 
@@ -130,12 +130,12 @@ mod tests {
         let mut path = Path::default();
         assert_eq!(path.iter().collect::<Vec<_>>(), vec![]);
 
+        path.push(2);
+        assert_eq!(path.iter().collect::<Vec<_>>(), vec![2]);
         path.push(0);
-        assert_eq!(path.iter().collect::<Vec<_>>(), vec![0]);
+        assert_eq!(path.iter().collect::<Vec<_>>(), vec![2, 0]);
         path.push(1);
-        assert_eq!(path.iter().collect::<Vec<_>>(), vec![0, 1]);
-        path.push(0);
-        assert_eq!(path.iter().collect::<Vec<_>>(), vec![0, 1, 0]);
+        assert_eq!(path.iter().collect::<Vec<_>>(), vec![2, 0, 1]);
         assert!(!matches!(path, Path::Vec(_)));
     }
 
@@ -144,13 +144,13 @@ mod tests {
         let mut path = Path::default();
         assert_eq!(path.iter().collect::<Vec<_>>(), vec![]);
 
-        path.push(2);
+        path.push(4);
         assert!(matches!(path, Path::Vec(_)));
-        assert_eq!(path.iter().collect::<Vec<_>>(), vec![2]);
+        assert_eq!(path.iter().collect::<Vec<_>>(), vec![4]);
         path.push(1);
-        assert_eq!(path.iter().collect::<Vec<_>>(), vec![2, 1]);
+        assert_eq!(path.iter().collect::<Vec<_>>(), vec![4, 1]);
         path.push(0);
-        assert_eq!(path.iter().collect::<Vec<_>>(), vec![2, 1, 0]);
+        assert_eq!(path.iter().collect::<Vec<_>>(), vec![4, 1, 0]);
     }
 
     #[test]
@@ -160,15 +160,15 @@ mod tests {
 
         path.push(0);
         assert_eq!(path.iter().collect::<Vec<_>>(), vec![0]);
-        path.push(1);
-        assert_eq!(path.iter().collect::<Vec<_>>(), vec![0, 1]);
+        path.push(3);
+        assert_eq!(path.iter().collect::<Vec<_>>(), vec![0, 3]);
         path.push(0);
-        assert_eq!(path.iter().collect::<Vec<_>>(), vec![0, 1, 0]);
+        assert_eq!(path.iter().collect::<Vec<_>>(), vec![0, 3, 0]);
         assert!(!matches!(path, Path::Vec(_)));
         path.push(88);
         assert!(matches!(path, Path::Vec(_)));
-        assert_eq!(path.iter().collect::<Vec<_>>(), vec![0, 1, 0, 88]);
+        assert_eq!(path.iter().collect::<Vec<_>>(), vec![0, 3, 0, 88]);
         path.push(1);
-        assert_eq!(path.iter().collect::<Vec<_>>(), vec![0, 1, 0, 88, 1]);
+        assert_eq!(path.iter().collect::<Vec<_>>(), vec![0, 3, 0, 88, 1]);
     }
 }
