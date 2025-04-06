@@ -110,6 +110,27 @@ impl Unary {
         }
     }
 
+    pub fn eval<C: EvalContext>(
+        &self,
+        ctx: &C,
+    ) -> Result<Box<dyn Iterator<Item = TyValue> + '_>, EvalError> {
+        use UnaryOp::*;
+        let iter = self.val.eval(ctx)?;
+        Ok(Box::new(iter.map(|v| match self.op {
+            Negate => match v {
+                TyValue::Rational(r) => TyValue::Rational(-r),
+                TyValue::Bool(b) => TyValue::Bool(!b),
+            },
+            Abs => {
+                use num::Signed;
+                match v {
+                    TyValue::Rational(r) => TyValue::Rational(r.abs()),
+                    TyValue::Bool(_) => unreachable!(),
+                }
+            }
+        })))
+    }
+
     pub(crate) fn pretty_str(&self, parent_precedence: Option<usize>) -> String {
         match self.op.parsing_precedence() {
             Some((_left_assoc, prec)) => {

@@ -1,9 +1,9 @@
 //! AST types for representing a math formula.
-use std::fmt;
-use std::ops::{Deref, DerefMut};
-
 use crate::ty::{Ty, TyValue};
 use crate::Path;
+use std::fmt;
+use std::iter::once;
+use std::ops::{Deref, DerefMut};
 
 mod node_const;
 pub use node_const::Const;
@@ -64,8 +64,14 @@ pub trait AstNode: Clone + Sized + std::fmt::Debug {
     fn returns(&self) -> Option<Ty>;
     /// Returns the types of the operands of this node.
     fn descendant_types(&self) -> impl Iterator<Item = Option<Ty>>;
+
     /// Attempts to evaluate the AST to a single finite value.
     fn finite_eval<C: EvalContext>(&self, ctx: &C) -> Result<TyValue, EvalError>;
+    /// Evaluates all possible values of the AST.
+    fn eval<C: EvalContext>(
+        &self,
+        ctx: &C,
+    ) -> Result<Box<dyn Iterator<Item = TyValue> + '_>, EvalError>;
 
     /// Recursively executes the given function on every node in the AST.
     /// The walk will end early if the given function returns false and
@@ -123,6 +129,12 @@ impl AstNode for Node {
     }
     fn finite_eval<C: EvalContext>(&self, ctx: &C) -> Result<TyValue, EvalError> {
         self.n.finite_eval(ctx)
+    }
+    fn eval<C: EvalContext>(
+        &self,
+        ctx: &C,
+    ) -> Result<Box<dyn Iterator<Item = TyValue> + '_>, EvalError> {
+        self.n.eval(ctx)
     }
     fn walk(&self, depth_first: bool, cb: &mut impl FnMut(&NodeInner) -> bool) {
         self.n.walk(depth_first, cb)
@@ -297,6 +309,12 @@ impl AstNode for HN {
     }
     fn finite_eval<C: EvalContext>(&self, ctx: &C) -> Result<TyValue, EvalError> {
         self.0.finite_eval(ctx)
+    }
+    fn eval<C: EvalContext>(
+        &self,
+        ctx: &C,
+    ) -> Result<Box<dyn Iterator<Item = TyValue> + '_>, EvalError> {
+        self.0.eval(ctx)
     }
     fn walk(&self, depth_first: bool, cb: &mut impl FnMut(&NodeInner) -> bool) {
         self.0.walk(depth_first, cb)
@@ -514,6 +532,21 @@ impl AstNode for NodeInner {
             Self::Piecewise(p) => p.finite_eval(ctx),
             Self::Var(v) => match ctx.resolve_var(v.ident()) {
                 Some(v) => Ok(v.clone()),
+                None => Err(EvalError::UnknownIdent(v.ident().to_string())),
+            },
+        }
+    }
+    fn eval<C: EvalContext>(
+        &self,
+        ctx: &C,
+    ) -> Result<Box<dyn Iterator<Item = TyValue> + '_>, EvalError> {
+        match self {
+            Self::Const(c) => Ok(Box::new(once(c.value().clone()))),
+            Self::Unary(u) => u.eval(ctx),
+            Self::Binary(b) => b.eval(ctx),
+            Self::Piecewise(p) => p.eval(ctx),
+            Self::Var(v) => match ctx.resolve_var(v.ident()) {
+                Some(v) => Ok(Box::new(once(v.clone()))),
                 None => Err(EvalError::UnknownIdent(v.ident().to_string())),
             },
         }
@@ -931,6 +964,44 @@ mod tests {
                 .unwrap()
                 .finite_eval(&vec![("x", 1.into()), ("y", 4.into())]),
             Ok(4.into()),
+        );
+    }
+
+    #[test]
+    fn eval_simple() {
+        assert_eq!(
+            Node::try_from("3.5 + 4.5")
+                .unwrap()
+                .eval(&())
+                .unwrap()
+                .collect::<Vec<_>>(),
+            vec![8.into()],
+        );
+        assert_eq!(
+            Node::try_from("9 - 3 * 2")
+                .unwrap()
+                .eval(&())
+                .unwrap()
+                .collect::<Vec<_>>(),
+            vec![3.into()],
+        );
+
+        assert_eq!(
+            Node::try_from("5 ± 1")
+                .unwrap()
+                .eval(&())
+                .unwrap()
+                .collect::<Vec<_>>(),
+            vec![6.into(), 4.into()],
+        );
+
+        assert_eq!(
+            Node::try_from("-{0±x if x > y; otherwise y}")
+                .unwrap()
+                .eval(&vec![("x", 2.into()), ("y", 1.into())])
+                .unwrap()
+                .collect::<Vec<_>>(),
+            vec![(-2).into(), 2.into()],
         );
     }
 

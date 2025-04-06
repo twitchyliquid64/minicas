@@ -54,6 +54,24 @@ impl Piecewise {
         }
         self.r#else.finite_eval(c)
     }
+
+    pub fn eval<C: EvalContext>(
+        &self,
+        ctx: &C,
+    ) -> Result<Box<dyn Iterator<Item = TyValue> + '_>, EvalError> {
+        for (e, cond) in self.r#if.iter() {
+            match cond.finite_eval(ctx)? {
+                TyValue::Bool(true) => {
+                    return e.eval(ctx);
+                }
+                TyValue::Bool(false) => {}
+                v => {
+                    return Err(EvalError::UnexpectedType(vec![v.ty()]));
+                }
+            }
+        }
+        self.r#else.eval(ctx)
+    }
 }
 
 impl fmt::Display for Piecewise {

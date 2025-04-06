@@ -255,71 +255,116 @@ impl Binary {
         return &mut self.rhs;
     }
 
+    #[inline]
+    fn eval_op(op: &BinaryOp, l: TyValue, r: TyValue) -> Result<TyValue, EvalError> {
+        use BinaryOp::*;
+        match (op, l, r) {
+            (PlusOrMinus, _, _) => Err(EvalError::Multiple),
+
+            (Add, TyValue::Rational(l), TyValue::Rational(r)) => Ok(TyValue::Rational(l + r)),
+            (Add, lv, rv) => Err(EvalError::UnexpectedType(vec![lv.ty(), rv.ty()])),
+
+            (Sub, TyValue::Rational(l), TyValue::Rational(r)) => Ok(TyValue::Rational(l - r)),
+            (Sub, lv, rv) => Err(EvalError::UnexpectedType(vec![lv.ty(), rv.ty()])),
+
+            (Mul, TyValue::Rational(l), TyValue::Rational(r)) => Ok(TyValue::Rational(l * r)),
+            (Mul, lv, rv) => Err(EvalError::UnexpectedType(vec![lv.ty(), rv.ty()])),
+
+            (Div, TyValue::Rational(l), TyValue::Rational(r)) => match l.checked_div(&r) {
+                Some(o) => Ok(TyValue::Rational(o)),
+                None => Err(EvalError::DivByZero),
+            },
+            (Div, lv, rv) => Err(EvalError::UnexpectedType(vec![lv.ty(), rv.ty()])),
+
+            (Pow, TyValue::Rational(l), TyValue::Rational(r)) => {
+                if r.is_integer() {
+                    use num::traits::Pow;
+                    Ok(TyValue::Rational(l.pow(r.numer())))
+                } else {
+                    Err(EvalError::PowNonInteger)
+                }
+            }
+            (Pow, lv, rv) => Err(EvalError::UnexpectedType(vec![lv.ty(), rv.ty()])),
+
+            (Cmp(CmpOp::Equals), TyValue::Rational(l), TyValue::Rational(r)) => {
+                Ok(TyValue::Bool(l == r))
+            }
+            (Cmp(CmpOp::Equals), TyValue::Bool(l), TyValue::Bool(r)) => Ok(TyValue::Bool(l == r)),
+            (Cmp(CmpOp::Equals), lv, rv) => Err(EvalError::UnexpectedType(vec![lv.ty(), rv.ty()])),
+
+            (Cmp(CmpOp::LessThan(false)), TyValue::Rational(l), TyValue::Rational(r)) => {
+                Ok(TyValue::Bool(l < r))
+            }
+            (Cmp(CmpOp::LessThan(false)), TyValue::Bool(l), TyValue::Bool(r)) => {
+                Ok(TyValue::Bool(l < r))
+            }
+            (Cmp(CmpOp::LessThan(false)), lv, rv) => {
+                Err(EvalError::UnexpectedType(vec![lv.ty(), rv.ty()]))
+            }
+
+            (Cmp(CmpOp::LessThan(true)), TyValue::Rational(l), TyValue::Rational(r)) => {
+                Ok(TyValue::Bool(l <= r))
+            }
+            (Cmp(CmpOp::LessThan(true)), TyValue::Bool(l), TyValue::Bool(r)) => {
+                Ok(TyValue::Bool(l <= r))
+            }
+            (Cmp(CmpOp::LessThan(true)), lv, rv) => {
+                Err(EvalError::UnexpectedType(vec![lv.ty(), rv.ty()]))
+            }
+
+            (Cmp(CmpOp::GreaterThan(false)), TyValue::Rational(l), TyValue::Rational(r)) => {
+                Ok(TyValue::Bool(l > r))
+            }
+            (Cmp(CmpOp::GreaterThan(false)), TyValue::Bool(l), TyValue::Bool(r)) => {
+                Ok(TyValue::Bool(l > r))
+            }
+            (Cmp(CmpOp::GreaterThan(false)), lv, rv) => {
+                Err(EvalError::UnexpectedType(vec![lv.ty(), rv.ty()]))
+            }
+
+            (Cmp(CmpOp::GreaterThan(true)), TyValue::Rational(l), TyValue::Rational(r)) => {
+                Ok(TyValue::Bool(l >= r))
+            }
+            (Cmp(CmpOp::GreaterThan(true)), TyValue::Bool(l), TyValue::Bool(r)) => {
+                Ok(TyValue::Bool(l >= r))
+            }
+            (Cmp(CmpOp::GreaterThan(true)), lv, rv) => {
+                Err(EvalError::UnexpectedType(vec![lv.ty(), rv.ty()]))
+            }
+        }
+    }
+
     /// Computes a single finite solution, if possible.
     pub fn finite_eval<C: EvalContext>(&self, c: &C) -> Result<TyValue, EvalError> {
+        Binary::eval_op(&self.op, self.lhs.finite_eval(c)?, self.rhs.finite_eval(c)?)
+    }
+
+    pub fn eval<C: EvalContext>(
+        &self,
+        ctx: &C,
+    ) -> Result<Box<dyn Iterator<Item = TyValue> + '_>, EvalError> {
+        let (l, r) = (self.lhs.eval(ctx)?, self.rhs.eval(ctx)?);
+
         use BinaryOp::*;
         match self.op {
-            Add => match (self.lhs.finite_eval(c)?, self.rhs.finite_eval(c)?) {
-                (TyValue::Rational(l), TyValue::Rational(r)) => Ok(TyValue::Rational(l + r)),
-                (lv, rv) => Err(EvalError::UnexpectedType(vec![lv.ty(), rv.ty()])),
-            },
-            Sub => match (self.lhs.finite_eval(c)?, self.rhs.finite_eval(c)?) {
-                (TyValue::Rational(l), TyValue::Rational(r)) => Ok(TyValue::Rational(l - r)),
-                (lv, rv) => Err(EvalError::UnexpectedType(vec![lv.ty(), rv.ty()])),
-            },
-            PlusOrMinus => Err(EvalError::Multiple),
-            Mul => match (self.lhs.finite_eval(c)?, self.rhs.finite_eval(c)?) {
-                (TyValue::Rational(l), TyValue::Rational(r)) => Ok(TyValue::Rational(l * r)),
-                (lv, rv) => Err(EvalError::UnexpectedType(vec![lv.ty(), rv.ty()])),
-            },
-            Div => match (self.lhs.finite_eval(c)?, self.rhs.finite_eval(c)?) {
-                (TyValue::Rational(l), TyValue::Rational(r)) => match l.checked_div(&r) {
-                    Some(o) => Ok(TyValue::Rational(o)),
-                    None => Err(EvalError::DivByZero),
-                },
-                (lv, rv) => Err(EvalError::UnexpectedType(vec![lv.ty(), rv.ty()])),
-            },
-            Pow => match (self.lhs.finite_eval(c)?, self.rhs.finite_eval(c)?) {
-                (TyValue::Rational(l), TyValue::Rational(r)) => {
-                    if r.is_integer() {
-                        use num::traits::Pow;
-                        Ok(TyValue::Rational(l.pow(r.numer())))
-                    } else {
-                        Err(EvalError::PowNonInteger)
-                    }
-                }
-                (lv, rv) => Err(EvalError::UnexpectedType(vec![lv.ty(), rv.ty()])),
-            },
+            PlusOrMinus => Ok(Box::new(
+                l.zip(r)
+                    .map(|(l, r)| match (l, r) {
+                        (TyValue::Rational(l), TyValue::Rational(r)) => [
+                            TyValue::Rational(l.clone() + r.clone()),
+                            TyValue::Rational(l - r),
+                        ],
+                        _ => unreachable!(),
+                    })
+                    .flatten(),
+            )),
 
-            Cmp(CmpOp::Equals) => match (self.lhs.finite_eval(c)?, self.rhs.finite_eval(c)?) {
-                (TyValue::Rational(l), TyValue::Rational(r)) => Ok(TyValue::Bool(l == r)),
-                (TyValue::Bool(l), TyValue::Bool(r)) => Ok(TyValue::Bool(l == r)),
-                (lv, rv) => Err(EvalError::UnexpectedType(vec![lv.ty(), rv.ty()])),
-            },
-            Cmp(CmpOp::LessThan(false)) => {
-                match (self.lhs.finite_eval(c)?, self.rhs.finite_eval(c)?) {
-                    (TyValue::Rational(l), TyValue::Rational(r)) => Ok(TyValue::Bool(l < r)),
-                    (lv, rv) => Err(EvalError::UnexpectedType(vec![lv.ty(), rv.ty()])),
+            _ => Ok(Box::new(l.zip(r).map(|(l, r)| {
+                match Binary::eval_op(&self.op, l, r) {
+                    Ok(v) => v,
+                    Err(e) => panic!("{:?}", e),
                 }
-            }
-            Cmp(CmpOp::LessThan(true)) => {
-                match (self.lhs.finite_eval(c)?, self.rhs.finite_eval(c)?) {
-                    (TyValue::Rational(l), TyValue::Rational(r)) => Ok(TyValue::Bool(l <= r)),
-                    (lv, rv) => Err(EvalError::UnexpectedType(vec![lv.ty(), rv.ty()])),
-                }
-            }
-            Cmp(CmpOp::GreaterThan(false)) => {
-                match (self.lhs.finite_eval(c)?, self.rhs.finite_eval(c)?) {
-                    (TyValue::Rational(l), TyValue::Rational(r)) => Ok(TyValue::Bool(l > r)),
-                    (lv, rv) => Err(EvalError::UnexpectedType(vec![lv.ty(), rv.ty()])),
-                }
-            }
-            Cmp(CmpOp::GreaterThan(true)) => {
-                match (self.lhs.finite_eval(c)?, self.rhs.finite_eval(c)?) {
-                    (TyValue::Rational(l), TyValue::Rational(r)) => Ok(TyValue::Bool(l >= r)),
-                    (lv, rv) => Err(EvalError::UnexpectedType(vec![lv.ty(), rv.ty()])),
-                }
-            }
+            }))),
         }
     }
 
