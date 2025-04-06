@@ -403,6 +403,10 @@ impl NodeInner {
     pub fn new_const<V: Into<TyValue>>(v: V) -> Self {
         Self::Const(Const::new(v.into()))
     }
+    /// Creates a new variable node with the given identifier.
+    pub fn new_var<S: Into<String>>(ident: S) -> Self {
+        Self::Var(Var::new_untyped(ident))
+    }
 
     /// Returns a ref to the inner [Const] if this node is that variant.
     pub fn as_const(&self) -> Option<&Const> {

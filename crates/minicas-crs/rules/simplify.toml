@@ -279,3 +279,13 @@ base = "1 / 2"
 replace = [
 	[[0], [1]],
 ]
+
+[elim-pm-by-0]
+meta = {is_simplify = true}
+match.op = 'pm'
+match.rhs = {const = '0'}
+replace.from = [0] # using the numerator (first lhs)
+replace.to = []    # overwrite self
+tests = [
+	{from = 'a ± 0', to = 'a'},
+]
