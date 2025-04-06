@@ -132,3 +132,19 @@ replace.to = []
 tests = [
     {from = 'pow(a, 2) / a', to = 'a'},
 ]
+
+[elim-root-of-equiv-pow]
+meta = {is_simplify = true}
+match.op = 'root'
+match.lhs = {op = 'pow'}
+match.equal = [{l = [1], r = [0, 1]}]
+
+tests = [
+    {from = 'sqrt(pow(a, 2))', to = 'abs(a)'},
+    {from = 'root(pow(b, 2x + 1), 2x + 1)', to = 'abs(b)'},
+]
+[elim-root-of-equiv-pow.rewrite]
+base = "abs(1)"
+replace = [
+    [[0, 0], [0]],
+]

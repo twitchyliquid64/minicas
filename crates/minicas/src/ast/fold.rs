@@ -35,6 +35,8 @@ pub fn fold<N: AstNode>(n: &mut N) -> Result<(), EvalError> {
                 Ok(v) => {
                     *n = NodeInner::new_const(v);
                 }
+                // Ignore multiple, just means we cant simplify in this case
+                Err(EvalError::Multiple) => {}
                 Err(e) => {
                     err = Err(e);
                 }
@@ -63,6 +65,13 @@ mod tests {
         let mut n = Node::try_from("2 + 3").unwrap();
         assert_eq!(fold(&mut n), Ok(()),);
         assert_eq!(n, Node::try_from("5").unwrap());
+    }
+
+    #[test]
+    fn binary_multiple_solutions() {
+        let mut n = Node::try_from("2 ± 1").unwrap();
+        assert_eq!(fold(&mut n), Ok(()),);
+        assert_eq!(n, Node::try_from("2 ± 1").unwrap());
     }
 
     #[test]

@@ -23,6 +23,7 @@ pub enum ParseNode<'a> {
     },
     Abs(Box<ParseNode<'a>>),
     Pow(Box<ParseNode<'a>>, Box<ParseNode<'a>>),
+    Root(Box<ParseNode<'a>>, Box<ParseNode<'a>>),
     Binary {
         op: &'a str,
         lhs: Box<ParseNode<'a>>,
@@ -90,6 +91,15 @@ fn parser(i: &str) -> IResult<&str, ParseNode> {
                 |n| Ok::<ParseNode<'_>, ()>(ParseNode::Abs(Box::new(n))),
             ),
             map_res(
+                preceded(multispace0, delimited(tag("sqrt("), parser, tag(")"))),
+                |n| {
+                    Ok::<ParseNode<'_>, ()>(ParseNode::Root(
+                        Box::new(n),
+                        Box::new(ParseNode::Int(2)),
+                    ))
+                },
+            ),
+            map_res(
                 preceded(
                     multispace0,
                     delimited(
@@ -100,6 +110,19 @@ fn parser(i: &str) -> IResult<&str, ParseNode> {
                 ),
                 |(l, r): (ParseNode, ParseNode)| {
                     Ok::<ParseNode<'_>, ()>(ParseNode::Pow(Box::new(l), Box::new(r)))
+                },
+            ),
+            map_res(
+                preceded(
+                    multispace0,
+                    delimited(
+                        tag("root("),
+                        separated_pair(parser, (multispace0, tag(",")), parser),
+                        tag(")"),
+                    ),
+                ),
+                |(l, r): (ParseNode, ParseNode)| {
+                    Ok::<ParseNode<'_>, ()>(ParseNode::Root(Box::new(l), Box::new(r)))
                 },
             ),
             map_res(preceded(multispace0, digit1), |s: &str| {

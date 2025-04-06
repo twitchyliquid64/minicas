@@ -31,7 +31,7 @@ pub use rearrange::make_subject;
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum EvalError {
     DivByZero,
-    PowNonInteger,
+    NonInteger,
     UnexpectedType(Vec<Ty>),
     UnknownIdent(String),
     Multiple,
@@ -212,6 +212,11 @@ impl<'a> TryFrom<parse::ParseNode<'a>> for Node {
                 }
             }
 
+            ParseNode::Root(operand, base) => {
+                let o = Node::try_from(*operand)?;
+                let b = Node::try_from(*base)?;
+                Ok(NodeInner::Binary(Binary::root(o, b)).into())
+            }
             ParseNode::Pow(l, r) => {
                 let l = Node::try_from(*l)?;
                 let r = Node::try_from(*r)?;
@@ -755,6 +760,19 @@ mod tests {
                 .into()
             )),
         );
+
+        assert_eq!(
+            Node::try_from("sqrt(4)"),
+            Ok(Node::new(
+                Binary::root::<TyValue, TyValue>(4.into(), 2.into(),).into()
+            )),
+        );
+        assert_eq!(
+            Node::try_from("root(8, 3)"),
+            Ok(Node::new(
+                Binary::root::<TyValue, TyValue>(8.into(), 3.into(),).into()
+            )),
+        );
     }
 
     #[test]
@@ -937,6 +955,12 @@ mod tests {
         assert_eq!(
             Node::try_from("9 - 3 * 2").unwrap().finite_eval(&()),
             Ok(3.into()),
+        );
+        assert_eq!(
+            Node::try_from("root(8, 3) + sqrt(4)")
+                .unwrap()
+                .finite_eval(&()),
+            Ok(4.into()),
         );
 
         assert_eq!(
