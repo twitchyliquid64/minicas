@@ -21,6 +21,8 @@ pub enum BinaryOp {
     Add,
     /// Binary subtraction
     Sub,
+    /// Binary plus or minus
+    PlusOrMinus,
     /// Binary Multiplication
     Mul,
     /// Binary Division
@@ -37,8 +39,10 @@ impl BinaryOp {
         use BinaryOp::*;
         use Ty::*;
         match (self, lhs, rhs) {
-            (Add | Sub | Mul | Div, Some(Rational) | None, Some(Rational) | None) => true,
-            (Add | Sub | Mul | Div, _, _) => false,
+            (Add | Sub | Mul | Div | PlusOrMinus, Some(Rational) | None, Some(Rational) | None) => {
+                true
+            }
+            (Add | Sub | Mul | Div | PlusOrMinus, _, _) => false,
             (Pow, Some(Rational) | None, Some(Rational) | None) => true,
             (Pow, _, _) => false,
             (Cmp(CmpOp::Equals), Some(Rational) | None, Some(Rational) | None) => true,
@@ -59,6 +63,7 @@ impl BinaryOp {
         match self {
             Add => Some((true, 2)),
             Sub => Some((true, 2)),
+            PlusOrMinus => Some((true, 2)),
             Mul => Some((true, 3)),
             Div => Some((true, 3)),
             Pow => None,
@@ -93,6 +98,7 @@ impl fmt::Display for BinaryOp {
         match self {
             Add => write!(f, "+"),
             Sub => write!(f, "-"),
+            PlusOrMinus => write!(f, "±"),
             Mul => write!(f, "*"),
             Div => write!(f, "/"),
             Pow => write!(f, "pow"),
@@ -134,6 +140,14 @@ impl Binary {
     pub fn sub<V1: Into<HN>, V2: Into<HN>>(lhs: V1, rhs: V2) -> Self {
         Self {
             op: BinaryOp::Sub,
+            lhs: lhs.into(),
+            rhs: rhs.into(),
+        }
+    }
+    /// Constructs a new plus-or-minus node.
+    pub fn plus_or_minus<V1: Into<HN>, V2: Into<HN>>(lhs: V1, rhs: V2) -> Self {
+        Self {
+            op: BinaryOp::PlusOrMinus,
             lhs: lhs.into(),
             rhs: rhs.into(),
         }
@@ -209,6 +223,7 @@ impl Binary {
         match self.op {
             Add => self.lhs.returns(),
             Sub => self.lhs.returns(),
+            PlusOrMinus => self.lhs.returns(),
             Mul => self.lhs.returns(),
             Div => self.lhs.returns(),
             Pow => self.lhs.returns(),
@@ -252,6 +267,7 @@ impl Binary {
                 (TyValue::Rational(l), TyValue::Rational(r)) => Ok(TyValue::Rational(l - r)),
                 (lv, rv) => Err(EvalError::UnexpectedType(vec![lv.ty(), rv.ty()])),
             },
+            PlusOrMinus => Err(EvalError::Multiple),
             Mul => match (self.lhs.finite_eval(c)?, self.rhs.finite_eval(c)?) {
                 (TyValue::Rational(l), TyValue::Rational(r)) => Ok(TyValue::Rational(l * r)),
                 (lv, rv) => Err(EvalError::UnexpectedType(vec![lv.ty(), rv.ty()])),

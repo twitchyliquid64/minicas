@@ -27,7 +27,7 @@ pub fn simplify(n: &mut Node, all: bool) -> Result<(), ()> {
 
         n.walk_mut(true, &mut |n| {
             for (_name, rule) in RULES.iter() {
-                if all || rule.meta.is_simplify {
+                if (all && !rule.meta.alt_form) || rule.meta.is_simplify {
                     rule_matched |= rule.eval(n).unwrap(); // TODO: dont just unwrap
                 }
             }

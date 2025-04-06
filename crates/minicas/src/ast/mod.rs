@@ -34,6 +34,7 @@ pub enum EvalError {
     PowNonInteger,
     UnexpectedType(Vec<Ty>),
     UnknownIdent(String),
+    Multiple,
 }
 
 /// Context that needs to be provided for evaluation.
@@ -209,6 +210,7 @@ impl<'a> TryFrom<parse::ParseNode<'a>> for Node {
                 match op {
                     "-" => Ok(NodeInner::Binary(Binary::sub(l, r)).into()),
                     "+" => Ok(NodeInner::Binary(Binary::add(l, r)).into()),
+                    "±" => Ok(NodeInner::Binary(Binary::plus_or_minus(l, r)).into()),
                     "*" => Ok(NodeInner::Binary(Binary::mul(l, r)).into()),
                     "/" => Ok(NodeInner::Binary(Binary::div(l, r)).into()),
                     "==" => Ok(NodeInner::Binary(Binary::equals(l, r)).into()),
@@ -702,6 +704,24 @@ mod tests {
                 .into()
             )),
         );
+
+        assert_eq!(
+            Node::try_from("x ± 4 * y"),
+            Ok(Node::new(
+                Binary::plus_or_minus::<HN, HN>(
+                    Node::new(Var::new_untyped("x").into()).into(),
+                    Node::new(
+                        Binary::mul::<TyValue, HN>(
+                            4.into(),
+                            Node::new(Var::new_untyped("y").into()).into(),
+                        )
+                        .into()
+                    )
+                    .into(),
+                )
+                .into()
+            )),
+        );
     }
 
     #[test]
@@ -807,6 +827,19 @@ mod tests {
                 "{}",
                 Node::new(
                     Binary::sub::<TyValue, HN>(
+                        3.into(),
+                        Node::new(Var::new_untyped("x").into()).into(),
+                    )
+                    .into()
+                )
+            )
+        );
+        assert_eq!(
+            "3 ± x",
+            format!(
+                "{}",
+                Node::new(
+                    Binary::plus_or_minus::<TyValue, HN>(
                         3.into(),
                         Node::new(Var::new_untyped("x").into()).into(),
                     )
