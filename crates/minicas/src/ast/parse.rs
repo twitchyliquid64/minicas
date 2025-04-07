@@ -24,6 +24,8 @@ pub enum ParseNode<'a> {
     Abs(Box<ParseNode<'a>>),
     Pow(Box<ParseNode<'a>>, Box<ParseNode<'a>>),
     Root(Box<ParseNode<'a>>, Box<ParseNode<'a>>),
+    Min(Box<ParseNode<'a>>, Box<ParseNode<'a>>),
+    Max(Box<ParseNode<'a>>, Box<ParseNode<'a>>),
     Binary {
         op: &'a str,
         lhs: Box<ParseNode<'a>>,
@@ -123,6 +125,32 @@ fn parser(i: &str) -> IResult<&str, ParseNode> {
                 ),
                 |(l, r): (ParseNode, ParseNode)| {
                     Ok::<ParseNode<'_>, ()>(ParseNode::Root(Box::new(l), Box::new(r)))
+                },
+            ),
+            map_res(
+                preceded(
+                    multispace0,
+                    delimited(
+                        tag("min("),
+                        separated_pair(parser, (multispace0, tag(",")), parser),
+                        tag(")"),
+                    ),
+                ),
+                |(l, r): (ParseNode, ParseNode)| {
+                    Ok::<ParseNode<'_>, ()>(ParseNode::Min(Box::new(l), Box::new(r)))
+                },
+            ),
+            map_res(
+                preceded(
+                    multispace0,
+                    delimited(
+                        tag("max("),
+                        separated_pair(parser, (multispace0, tag(",")), parser),
+                        tag(")"),
+                    ),
+                ),
+                |(l, r): (ParseNode, ParseNode)| {
+                    Ok::<ParseNode<'_>, ()>(ParseNode::Max(Box::new(l), Box::new(r)))
                 },
             ),
             map_res(preceded(multispace0, digit1), |s: &str| {

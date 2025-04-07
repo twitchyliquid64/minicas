@@ -33,6 +33,10 @@ pub enum BinaryOp {
     Pow,
     /// Root of some integer
     Root,
+    /// Minimum
+    Min,
+    /// Maximum
+    Max,
 }
 
 impl BinaryOp {
@@ -47,6 +51,8 @@ impl BinaryOp {
             (Add | Sub | Mul | Div | PlusOrMinus, _, _) => false,
             (Pow | Root, Some(Rational) | None, Some(Rational) | None) => true,
             (Pow | Root, _, _) => false,
+            (Min | Max, Some(Rational) | None, Some(Rational) | None) => true,
+            (Min | Max, _, _) => false,
             (Cmp(CmpOp::Equals), Some(Rational) | None, Some(Rational) | None) => true,
             (Cmp(CmpOp::Equals), Some(Bool) | None, Some(Bool) | None) => true,
             (Cmp(CmpOp::Equals), _, _) => false,
@@ -68,7 +74,7 @@ impl BinaryOp {
             PlusOrMinus => Some((true, 2)),
             Mul => Some((true, 3)),
             Div => Some((true, 3)),
-            Pow | Root => None,
+            Pow | Root | Min | Max => None,
             Cmp(CmpOp::Equals) => Some((true, 4)),
             Cmp(CmpOp::LessThan(_)) => Some((true, 4)),
             Cmp(CmpOp::GreaterThan(_)) => Some((true, 4)),
@@ -89,6 +95,7 @@ impl BinaryOp {
         use BinaryOp::*;
         match self {
             Add | Mul => true,
+            Min | Max => true,
             _ => false,
         }
     }
@@ -105,6 +112,8 @@ impl fmt::Display for BinaryOp {
             Div => write!(f, "/"),
             Pow => write!(f, "pow"),
             Root => write!(f, "root"),
+            Min => write!(f, "min"),
+            Max => write!(f, "max"),
             Cmp(CmpOp::Equals) => write!(f, "=="),
             Cmp(CmpOp::LessThan(false)) => write!(f, "<"),
             Cmp(CmpOp::LessThan(true)) => write!(f, "<="),
@@ -187,6 +196,22 @@ impl Binary {
             rhs: rhs.into(),
         }
     }
+    /// Constructs a new min node.
+    pub fn min<V1: Into<HN>, V2: Into<HN>>(lhs: V1, rhs: V2) -> Self {
+        Self {
+            op: BinaryOp::Min,
+            lhs: lhs.into(),
+            rhs: rhs.into(),
+        }
+    }
+    /// Constructs a new max node.
+    pub fn max<V1: Into<HN>, V2: Into<HN>>(lhs: V1, rhs: V2) -> Self {
+        Self {
+            op: BinaryOp::Max,
+            lhs: lhs.into(),
+            rhs: rhs.into(),
+        }
+    }
     /// Constructs a new equals node.
     pub fn equals<V1: Into<HN>, V2: Into<HN>>(lhs: V1, rhs: V2) -> Self {
         Self {
@@ -239,6 +264,8 @@ impl Binary {
             Div => self.lhs.returns(),
             Pow => self.lhs.returns(),
             Root => self.lhs.returns(),
+            Min => self.lhs.returns(),
+            Max => self.lhs.returns(),
             Cmp(CmpOp::Equals) => Some(Ty::Bool),
             Cmp(CmpOp::LessThan(_)) => Some(Ty::Bool),
             Cmp(CmpOp::GreaterThan(_)) => Some(Ty::Bool),
@@ -307,6 +334,11 @@ impl Binary {
                 }
             }
             (Root, lv, rv) => Err(EvalError::UnexpectedType(vec![lv.ty(), rv.ty()])),
+
+            (Min, TyValue::Rational(l), TyValue::Rational(r)) => Ok(TyValue::Rational(l.min(r))),
+            (Min, lv, rv) => Err(EvalError::UnexpectedType(vec![lv.ty(), rv.ty()])),
+            (Max, TyValue::Rational(l), TyValue::Rational(r)) => Ok(TyValue::Rational(l.max(r))),
+            (Max, lv, rv) => Err(EvalError::UnexpectedType(vec![lv.ty(), rv.ty()])),
 
             (Cmp(CmpOp::Equals), TyValue::Rational(l), TyValue::Rational(r)) => {
                 Ok(TyValue::Bool(l == r))
@@ -544,6 +576,17 @@ mod tests {
         assert_eq!(
             Binary::root::<TyValue, TyValue>(8usize.into(), 3usize.into()).finite_eval(&()),
             Ok(2.into())
+        );
+    }
+    #[test]
+    fn min_max_finite_eval() {
+        assert_eq!(
+            Binary::min::<TyValue, TyValue>(9usize.into(), 2usize.into()).finite_eval(&()),
+            Ok(2.into())
+        );
+        assert_eq!(
+            Binary::max::<TyValue, TyValue>(8usize.into(), 3usize.into()).finite_eval(&()),
+            Ok(8.into())
         );
     }
 }

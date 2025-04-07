@@ -222,6 +222,16 @@ impl<'a> TryFrom<parse::ParseNode<'a>> for Node {
                 let r = Node::try_from(*r)?;
                 Ok(NodeInner::Binary(Binary::pow(l, r)).into())
             }
+            ParseNode::Min(l, r) => {
+                let l = Node::try_from(*l)?;
+                let r = Node::try_from(*r)?;
+                Ok(NodeInner::Binary(Binary::min(l, r)).into())
+            }
+            ParseNode::Max(l, r) => {
+                let l = Node::try_from(*l)?;
+                let r = Node::try_from(*r)?;
+                Ok(NodeInner::Binary(Binary::max(l, r)).into())
+            }
             ParseNode::Binary { op, lhs, rhs } => {
                 let (l, r) = (Node::try_from(*lhs)?, Node::try_from(*rhs)?);
                 match op {
@@ -965,6 +975,12 @@ mod tests {
                 .unwrap()
                 .finite_eval(&()),
             Ok(4.into()),
+        );
+        assert_eq!(
+            Node::try_from("min(2 + 1, max(4, 2))")
+                .unwrap()
+                .finite_eval(&()),
+            Ok(3.into()),
         );
 
         assert_eq!(
