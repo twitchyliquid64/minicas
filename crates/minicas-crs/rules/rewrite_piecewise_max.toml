@@ -1,0 +1,115 @@
+[piecewise-gt-as-max]
+meta.alt_form = true
+match.op = 'piecewise'
+match.num_arms = 2
+match.children = [
+	# arm 1
+	{not_op = 'const'},
+	# arm 1, conditional
+	{op = '>', rhs = {not_op = 'const'}},
+	# arm 2, else case
+	{},
+]
+match.equal = [
+	# arm 1 is equal to lhs of conditional
+	{l = [0], r = [1, 0]},
+	# the else is equal to the rhs of conditional
+	{l = [2], r = [1, 1]},
+]
+tests = [
+    {from = '{x if x > y; otherwise y}', to = 'max(x, y)'},
+]
+
+[piecewise-gt-as-max.rewrite]
+base = "max(1, 2)"
+replace = [
+    [[0], [0]],
+    [[2], [1]],
+]
+
+[piecewise-gte-as-max]
+meta.alt_form = true
+match.op = 'piecewise'
+match.num_arms = 2
+match.children = [
+	# arm 1
+	{not_op = 'const'},
+	# arm 1, conditional
+	{op = '>=', rhs = {not_op = 'const'}},
+	# arm 2, else case
+	{},
+]
+match.equal = [
+	# arm 1 is equal to lhs of conditional
+	{l = [0], r = [1, 0]},
+	# the else is equal to the rhs of conditional
+	{l = [2], r = [1, 1]},
+]
+tests = [
+    {from = '{x if x >= y; otherwise y}', to = 'max(x, y)'},
+]
+
+[piecewise-gte-as-max.rewrite]
+base = "max(1, 2)"
+replace = [
+    [[0], [0]],
+    [[2], [1]],
+]
+
+[piecewise-lt-as-max]
+meta.alt_form = true
+match.op = 'piecewise'
+match.num_arms = 2
+match.children = [
+	# arm 1
+	{not_op = 'const'},
+	# arm 1, conditional
+	{op = '<', rhs = {not_op = 'const'}},
+	# arm 2, else case
+	{},
+]
+match.equal = [
+	# arm 1 is equal to lhs of conditional
+	{l = [0], r = [1, 1]},
+	# the else is equal to the rhs of conditional
+	{l = [2], r = [1, 0]},
+]
+tests = [
+    {from = '{y if x < y; otherwise x}', to = 'max(x, y)'},
+]
+
+[piecewise-lt-as-max.rewrite]
+base = "max(1, 2)"
+replace = [
+    [[2], [0]],
+    [[0], [1]],
+]
+
+[piecewise-lte-as-max]
+meta.alt_form = true
+match.op = 'piecewise'
+match.num_arms = 2
+match.children = [
+	# arm 1
+	{not_op = 'const'},
+	# arm 1, conditional
+	{op = '<=', rhs = {not_op = 'const'}},
+	# arm 2, else case
+	{},
+]
+match.equal = [
+	# arm 1 is equal to lhs of conditional
+	{l = [0], r = [1, 1]},
+	# the else is equal to the rhs of conditional
+	{l = [2], r = [1, 0]},
+]
+tests = [
+    {from = '{y if x <= y; otherwise x}', to = 'max(x, y)'},
+]
+
+[piecewise-lte-as-max.rewrite]
+base = "max(1, 2)"
+replace = [
+    [[2], [0]],
+    [[0], [1]],
+]

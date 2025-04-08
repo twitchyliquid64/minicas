@@ -37,13 +37,16 @@ impl TryFrom<&str> for PredicateOp {
 
             "neg" => Ok(Self::Unary(UnaryOp::Negate)),
             "abs" => Ok(Self::Unary(UnaryOp::Abs)),
+
             "pow" => Ok(Self::Binary(BinaryOp::Pow)),
             "root" => Ok(Self::Binary(BinaryOp::Root)),
-            "pm" => Ok(Self::Binary(BinaryOp::PlusOrMinus)),
+            "pm" | "±" => Ok(Self::Binary(BinaryOp::PlusOrMinus)),
             "-" => Ok(Self::Binary(BinaryOp::Sub)),
             "+" => Ok(Self::Binary(BinaryOp::Add)),
             "/" => Ok(Self::Binary(BinaryOp::Div)),
             "*" => Ok(Self::Binary(BinaryOp::Mul)),
+            "min" => Ok(Self::Binary(BinaryOp::Min)),
+            "max" => Ok(Self::Binary(BinaryOp::Max)),
             "==" => Ok(Self::Binary(BinaryOp::Cmp(CmpOp::Equals))),
             "<" => Ok(Self::Binary(BinaryOp::Cmp(CmpOp::LessThan(false)))),
             "<=" => Ok(Self::Binary(BinaryOp::Cmp(CmpOp::LessThan(true)))),

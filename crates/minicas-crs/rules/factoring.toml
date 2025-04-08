@@ -97,6 +97,25 @@ fold = [
     [0],
 ]
 
+[mul-coefficients-rhs]
+match.op = '*'
+match.lhs = {op = '*', lhs = {op = 'const'}}
+match.rhs = {op = 'const'}
+
+tests = [
+    {from = '3x * 2', to = '6x'},
+]
+[mul-coefficients-rhs.rewrite]
+base = "(1*2) * 3"
+replace = [
+    [[1], [0, 0]],
+    [[0, 0], [0, 1]],
+    [[0, 1], [1]],
+]
+fold = [
+    [0],
+]
+
 [mul-nested-coefficients-lhs]
 match.op = '*'
 match.lhs = {op = '*', lhs = {op = 'const'}}
