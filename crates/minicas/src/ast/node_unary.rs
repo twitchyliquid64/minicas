@@ -1,4 +1,4 @@
-use crate::ast::{AstNode, EvalContext, EvalError, HN};
+use crate::ast::{AstNode, EvalContext, EvalContextInterval, EvalError, HN};
 use crate::{Ty, TyValue};
 use std::fmt;
 
@@ -126,6 +126,41 @@ impl Unary {
                 match v {
                     TyValue::Rational(r) => TyValue::Rational(r.abs()),
                     TyValue::Bool(_) => unreachable!(),
+                }
+            }
+        })))
+    }
+
+    pub fn eval_interval<C: EvalContextInterval>(
+        &self,
+        ctx: &C,
+    ) -> Result<Box<dyn Iterator<Item = (TyValue, TyValue)> + '_>, EvalError> {
+        use UnaryOp::*;
+        let iter = self.val.eval_interval(ctx)?;
+        Ok(Box::new(iter.map(|(min, max)| match self.op {
+            Negate => match (min, max) {
+                (TyValue::Rational(min), TyValue::Rational(max)) => {
+                    (TyValue::Rational(-max), TyValue::Rational(-min))
+                }
+                _ => unreachable!(),
+            },
+            Abs => {
+                use num::Signed;
+                match (min, max) {
+                    (TyValue::Rational(min), TyValue::Rational(max)) => {
+                        use num::rational::BigRational;
+                        let zero = BigRational::from_integer(0.into());
+
+                        if min >= zero {
+                            // already correct
+                            (TyValue::Rational(min), TyValue::Rational(max))
+                        } else if max < zero {
+                            (TyValue::Rational(-max), TyValue::Rational(-min))
+                        } else {
+                            (0.into(), TyValue::Rational(min.abs().max(max.abs())))
+                        }
+                    }
+                    _ => unreachable!(),
                 }
             }
         })))

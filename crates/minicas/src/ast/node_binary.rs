@@ -1,6 +1,7 @@
-use crate::ast::{AstNode, EvalContext, EvalError, NodeInner, HN};
+use crate::ast::{AstNode, EvalContext, EvalContextInterval, EvalError, NodeInner, HN};
 use crate::{Ty, TyValue};
-use num::CheckedDiv;
+use itertools::Itertools;
+use num::{BigRational, CheckedDiv};
 use std::fmt;
 
 /// CmpOp enumerations binary operations which compare values.
@@ -397,29 +398,159 @@ impl Binary {
         &self,
         ctx: &C,
     ) -> Result<Box<dyn Iterator<Item = TyValue> + '_>, EvalError> {
-        let (l, r) = (self.lhs.eval(ctx)?, self.rhs.eval(ctx)?);
+        let (l, r) = (
+            self.lhs.eval(ctx)?.collect::<Vec<_>>(),
+            self.rhs.eval(ctx)?.collect::<Vec<_>>(),
+        );
 
         use BinaryOp::*;
         match self.op {
             PlusOrMinus => Ok(Box::new(
-                l.zip(r)
-                    .map(|(l, r)| match (l, r) {
-                        (TyValue::Rational(l), TyValue::Rational(r)) => [
-                            TyValue::Rational(l.clone() + r.clone()),
-                            TyValue::Rational(l - r),
-                        ],
-                        _ => unreachable!(),
+                l.into_iter()
+                    .cartesian_product(r.into_iter())
+                    .map(|(l, r)| {
+                        [
+                            Binary::eval_op(&BinaryOp::Add, l.clone(), r.clone()).unwrap(),
+                            Binary::eval_op(&BinaryOp::Sub, l, r).unwrap(),
+                        ]
                     })
                     .flatten(),
             )),
 
-            _ => Ok(Box::new(l.zip(r).map(|(l, r)| {
-                match Binary::eval_op(&self.op, l, r) {
-                    Ok(v) => v,
-                    Err(e) => panic!("{:?}", e),
-                }
-            }))),
+            _ => Ok(Box::new(
+                l.into_iter()
+                    .cartesian_product(r.into_iter())
+                    .map(|(l, r)| match Binary::eval_op(&self.op, l, r) {
+                        Ok(v) => v,
+                        Err(e) => panic!("{:?}", e),
+                    }),
+            )),
         }
+    }
+
+    pub fn eval_interval<C: EvalContextInterval>(
+        &self,
+        ctx: &C,
+    ) -> Result<Box<dyn Iterator<Item = (TyValue, TyValue)> + '_>, EvalError> {
+        let (l, r) = (
+            self.lhs.eval_interval(ctx)?.collect::<Vec<_>>(),
+            self.rhs.eval_interval(ctx)?.collect::<Vec<_>>(),
+        );
+
+        use BinaryOp::*;
+        Ok(Box::new(
+            l.into_iter()
+                .cartesian_product(r.into_iter())
+                .map(|(l, r)| match (self.op, l, r) {
+                    (
+                        Add,
+                        (TyValue::Rational(l_min), TyValue::Rational(l_max)),
+                        (TyValue::Rational(r_min), TyValue::Rational(r_max)),
+                    ) => (
+                        TyValue::Rational(l_min + r_min),
+                        TyValue::Rational(l_max + r_max),
+                    ),
+                    (
+                        Sub,
+                        (TyValue::Rational(l_min), TyValue::Rational(l_max)),
+                        (TyValue::Rational(r_min), TyValue::Rational(r_max)),
+                    ) => (
+                        TyValue::Rational(l_min - r_max),
+                        TyValue::Rational(l_max - r_min),
+                    ),
+                    (
+                        Mul,
+                        (TyValue::Rational(l1), TyValue::Rational(l2)),
+                        (TyValue::Rational(r1), TyValue::Rational(r2)),
+                    ) => (
+                        TyValue::Rational(
+                            (l1.clone() * r1.clone())
+                                .min(l1.clone() * r2.clone())
+                                .min(l2.clone() * r1.clone())
+                                .min(l2.clone() * r2.clone()),
+                        ),
+                        TyValue::Rational(
+                            (l1.clone() * r1.clone())
+                                .max(l1.clone() * r2.clone())
+                                .max(l2.clone() * r1.clone())
+                                .max(l2.clone() * r2.clone()),
+                        ),
+                    ),
+
+                    (
+                        Div,
+                        (TyValue::Rational(l1), TyValue::Rational(l2)),
+                        (TyValue::Rational(r1), TyValue::Rational(r2)),
+                    ) => {
+                        let zero = BigRational::from_integer(0.into());
+                        // If denominator includes zero
+                        if r1 <= zero && r2 >= zero {
+                            if r1 == zero && r2 == zero {
+                                panic!("div by zero");
+                            }
+
+                            if l1 == zero && l2 == zero {
+                                return (zero.clone().into(), zero.into());
+                            }
+                            panic!("whole range!");
+                        }
+
+                        let (a, b) = (l1, l2);
+                        let (c, d) = (r1, r2);
+
+                        // Case 1: [a,b] with a ≥ 0 and [c,d] with c > 0
+                        if a >= zero && c > zero {
+                            return ((a / d).into(), (b / c).into());
+                        }
+
+                        // Case 2: [a,b] with a ≥ 0 and [c,d] with d < 0
+                        if a >= zero && d < zero {
+                            return ((b / d).into(), (a / c).into());
+                        }
+
+                        // Case 3: [a,b] with b ≤ 0 and [c,d] with c > 0
+                        if b <= zero && c > zero {
+                            return ((a / c).into(), (b / d).into());
+                        }
+
+                        // Case 4: [a,b] with b ≤ 0 and [c,d] with d < 0
+                        if b <= zero && d < zero {
+                            return ((b / c).into(), (a / d).into());
+                        }
+
+                        // Case 5: [a,b] with a < 0 < b and [c,d] with c > 0
+                        if a < zero && b > zero && c > zero {
+                            return ((a / c.clone()).into(), (b / c).into());
+                        }
+
+                        // Case 6: [a,b] with a < 0 < b and [c,d] with d < 0
+                        if a < zero && b > zero && d < zero {
+                            return ((b / d.clone()).into(), (a / d).into());
+                        }
+
+                        unreachable!();
+                    }
+
+                    (
+                        Min,
+                        (TyValue::Rational(l_min), TyValue::Rational(l_max)),
+                        (TyValue::Rational(r_min), TyValue::Rational(r_max)),
+                    ) => (
+                        TyValue::Rational(l_min.min(r_min)),
+                        TyValue::Rational(l_max.min(r_max)),
+                    ),
+                    (
+                        Max,
+                        (TyValue::Rational(l_min), TyValue::Rational(l_max)),
+                        (TyValue::Rational(r_min), TyValue::Rational(r_max)),
+                    ) => (
+                        TyValue::Rational(l_min.max(r_min)),
+                        TyValue::Rational(l_max.max(r_max)),
+                    ),
+
+                    _ => todo!(),
+                }),
+        ))
     }
 
     pub(crate) fn pretty_str(&self, parent_precedence: Option<usize>) -> String {
@@ -587,6 +718,71 @@ mod tests {
         assert_eq!(
             Binary::max::<TyValue, TyValue>(8usize.into(), 3usize.into()).finite_eval(&()),
             Ok(8.into())
+        );
+    }
+
+    #[test]
+    fn interval_eval() {
+        use crate::ast::Node;
+        assert_eq!(
+            Node::try_from("3.5 + 4.5")
+                .unwrap()
+                .eval_interval(&())
+                .unwrap()
+                .collect::<Vec<_>>(),
+            vec![(8.into(), 8.into())],
+        );
+        assert_eq!(
+            Node::try_from("min(3, 4)")
+                .unwrap()
+                .eval_interval(&())
+                .unwrap()
+                .collect::<Vec<_>>(),
+            vec![(3.into(), 3.into())],
+        );
+
+        assert_eq!(
+            Node::try_from("min(x, y)")
+                .unwrap()
+                .eval_interval(&vec![
+                    ("x", (1.into(), 2.into())),
+                    ("y", (5.into(), 6.into()))
+                ])
+                .unwrap()
+                .collect::<Vec<_>>(),
+            vec![(1.into(), 2.into())],
+        );
+        assert_eq!(
+            Node::try_from("min(x, y)")
+                .unwrap()
+                .eval_interval(&vec![
+                    ("x", (1.into(), 3.into())),
+                    ("y", (2.into(), 4.into()))
+                ])
+                .unwrap()
+                .collect::<Vec<_>>(),
+            vec![(1.into(), 3.into())],
+        );
+
+        assert_eq!(
+            Node::try_from("a / 2")
+                .unwrap()
+                .eval_interval(&vec![("a", (2.into(), 4.into())),])
+                .unwrap()
+                .collect::<Vec<_>>(),
+            vec![(1.into(), 2.into())],
+        );
+
+        assert_eq!(
+            Node::try_from("a / b")
+                .unwrap()
+                .eval_interval(&vec![
+                    ("a", (1.into(), 3.into())),
+                    ("b", (2.into(), 4.into()))
+                ])
+                .unwrap()
+                .collect::<Vec<_>>(),
+            vec![(0.25.into(), 1.5.into())],
         );
     }
 }

@@ -1,4 +1,4 @@
-use crate::ast::{AstNode, EvalContext, EvalError, HN};
+use crate::ast::{AstNode, EvalContext, EvalContextInterval, EvalError, HN};
 use crate::{Ty, TyValue};
 use std::fmt;
 
@@ -71,6 +71,24 @@ impl Piecewise {
             }
         }
         self.r#else.eval(ctx)
+    }
+
+    pub fn eval_interval<C: EvalContextInterval>(
+        &self,
+        ctx: &C,
+    ) -> Result<Box<dyn Iterator<Item = (TyValue, TyValue)> + '_>, EvalError> {
+        for (e, cond) in self.r#if.iter() {
+            match cond.eval_interval(ctx)?.next().unwrap().0 {
+                TyValue::Bool(true) => {
+                    return e.eval_interval(ctx);
+                }
+                TyValue::Bool(false) => {}
+                v => {
+                    return Err(EvalError::UnexpectedType(vec![v.ty()]));
+                }
+            }
+        }
+        self.r#else.eval_interval(ctx)
     }
 }
 

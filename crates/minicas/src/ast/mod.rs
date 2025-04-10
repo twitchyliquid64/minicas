@@ -59,6 +59,28 @@ impl<S: AsRef<str>> EvalContext for Vec<(S, TyValue)> {
     }
 }
 
+/// [EvalContext] variant for integer arithmetic.
+pub trait EvalContextInterval {
+    fn resolve_var(&self, id: &str) -> Option<(&TyValue, &TyValue)>;
+}
+
+impl EvalContextInterval for () {
+    fn resolve_var(&self, _id: &str) -> Option<(&TyValue, &TyValue)> {
+        None
+    }
+}
+
+impl<S: AsRef<str>> EvalContextInterval for Vec<(S, (TyValue, TyValue))> {
+    fn resolve_var(&self, id: &str) -> Option<(&TyValue, &TyValue)> {
+        for (ident, val) in self {
+            if ident.as_ref() == id {
+                return Some((&val.0, &val.1));
+            }
+        }
+        None
+    }
+}
+
 pub trait AstNode: Clone + Sized + std::fmt::Debug {
     /// Returns the type of the value this node yields.
     fn returns(&self) -> Option<Ty>;
@@ -72,6 +94,11 @@ pub trait AstNode: Clone + Sized + std::fmt::Debug {
         &self,
         ctx: &C,
     ) -> Result<Box<dyn Iterator<Item = TyValue> + '_>, EvalError>;
+    /// Interval variant of [AstNode::eval].
+    fn eval_interval<C: EvalContextInterval>(
+        &self,
+        ctx: &C,
+    ) -> Result<Box<dyn Iterator<Item = (TyValue, TyValue)> + '_>, EvalError>;
 
     /// Recursively executes the given function on every node in the AST.
     /// The walk will end early if the given function returns false and
@@ -135,6 +162,12 @@ impl AstNode for Node {
         ctx: &C,
     ) -> Result<Box<dyn Iterator<Item = TyValue> + '_>, EvalError> {
         self.n.eval(ctx)
+    }
+    fn eval_interval<C: EvalContextInterval>(
+        &self,
+        ctx: &C,
+    ) -> Result<Box<dyn Iterator<Item = (TyValue, TyValue)> + '_>, EvalError> {
+        self.n.eval_interval(ctx)
     }
     fn walk(&self, depth_first: bool, cb: &mut impl FnMut(&NodeInner) -> bool) {
         self.n.walk(depth_first, cb)
@@ -330,6 +363,12 @@ impl AstNode for HN {
         ctx: &C,
     ) -> Result<Box<dyn Iterator<Item = TyValue> + '_>, EvalError> {
         self.0.eval(ctx)
+    }
+    fn eval_interval<C: EvalContextInterval>(
+        &self,
+        ctx: &C,
+    ) -> Result<Box<dyn Iterator<Item = (TyValue, TyValue)> + '_>, EvalError> {
+        self.0.eval_interval(ctx)
     }
     fn walk(&self, depth_first: bool, cb: &mut impl FnMut(&NodeInner) -> bool) {
         self.0.walk(depth_first, cb)
@@ -566,6 +605,21 @@ impl AstNode for NodeInner {
             Self::Piecewise(p) => p.eval(ctx),
             Self::Var(v) => match ctx.resolve_var(v.ident()) {
                 Some(v) => Ok(Box::new(once(v.clone()))),
+                None => Err(EvalError::UnknownIdent(v.ident().to_string())),
+            },
+        }
+    }
+    fn eval_interval<C: EvalContextInterval>(
+        &self,
+        ctx: &C,
+    ) -> Result<Box<dyn Iterator<Item = (TyValue, TyValue)> + '_>, EvalError> {
+        match self {
+            Self::Const(c) => Ok(Box::new(once((c.value().clone(), c.value().clone())))),
+            Self::Unary(u) => u.eval_interval(ctx),
+            Self::Binary(b) => b.eval_interval(ctx),
+            Self::Piecewise(p) => p.eval_interval(ctx),
+            Self::Var(v) => match ctx.resolve_var(v.ident()) {
+                Some((v_min, v_max)) => Ok(Box::new(once((v_min.clone(), v_max.clone())))),
                 None => Err(EvalError::UnknownIdent(v.ident().to_string())),
             },
         }
@@ -1038,6 +1092,14 @@ mod tests {
                 .collect::<Vec<_>>(),
             vec![6.into(), 4.into()],
         );
+        assert_eq!(
+            Node::try_from("2 * (5 ± 1)")
+                .unwrap()
+                .eval(&())
+                .unwrap()
+                .collect::<Vec<_>>(),
+            vec![12.into(), 8.into()],
+        );
 
         assert_eq!(
             Node::try_from("-{0±x if x > y; otherwise y}")
@@ -1046,6 +1108,21 @@ mod tests {
                 .unwrap()
                 .collect::<Vec<_>>(),
             vec![(-2).into(), 2.into()],
+        );
+    }
+
+    #[test]
+    fn interval_eval() {
+        assert_eq!(
+            Node::try_from("x - 2y")
+                .unwrap()
+                .eval_interval(&vec![
+                    ("x", (1.into(), 2.into())),
+                    ("y", (5.into(), 6.into()))
+                ])
+                .unwrap()
+                .collect::<Vec<_>>(),
+            vec![((-11).into(), (-8).into())],
         );
     }
 
