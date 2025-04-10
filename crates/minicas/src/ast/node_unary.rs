@@ -113,19 +113,21 @@ impl Unary {
     pub fn eval<C: EvalContext>(
         &self,
         ctx: &C,
-    ) -> Result<Box<dyn Iterator<Item = TyValue> + '_>, EvalError> {
+    ) -> Result<Box<dyn Iterator<Item = Result<TyValue, EvalError>> + '_>, EvalError> {
         use UnaryOp::*;
         let iter = self.val.eval(ctx)?;
         Ok(Box::new(iter.map(|v| match self.op {
             Negate => match v {
-                TyValue::Rational(r) => TyValue::Rational(-r),
-                TyValue::Bool(b) => TyValue::Bool(!b),
+                Ok(TyValue::Rational(r)) => Ok(TyValue::Rational(-r)),
+                Ok(TyValue::Bool(b)) => Ok(TyValue::Bool(!b)),
+                Err(e) => Err(e),
             },
             Abs => {
                 use num::Signed;
                 match v {
-                    TyValue::Rational(r) => TyValue::Rational(r.abs()),
-                    TyValue::Bool(_) => unreachable!(),
+                    Ok(TyValue::Rational(r)) => Ok(TyValue::Rational(r.abs())),
+                    Ok(TyValue::Bool(_)) => Err(EvalError::UnexpectedType(vec![Ty::Bool])),
+                    Err(e) => Err(e),
                 }
             }
         })))

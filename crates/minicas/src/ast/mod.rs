@@ -93,7 +93,7 @@ pub trait AstNode: Clone + Sized + std::fmt::Debug {
     fn eval<C: EvalContext>(
         &self,
         ctx: &C,
-    ) -> Result<Box<dyn Iterator<Item = TyValue> + '_>, EvalError>;
+    ) -> Result<Box<dyn Iterator<Item = Result<TyValue, EvalError>> + '_>, EvalError>;
     /// Interval variant of [AstNode::eval].
     fn eval_interval<C: EvalContextInterval>(
         &self,
@@ -160,7 +160,7 @@ impl AstNode for Node {
     fn eval<C: EvalContext>(
         &self,
         ctx: &C,
-    ) -> Result<Box<dyn Iterator<Item = TyValue> + '_>, EvalError> {
+    ) -> Result<Box<dyn Iterator<Item = Result<TyValue, EvalError>> + '_>, EvalError> {
         self.n.eval(ctx)
     }
     fn eval_interval<C: EvalContextInterval>(
@@ -361,7 +361,7 @@ impl AstNode for HN {
     fn eval<C: EvalContext>(
         &self,
         ctx: &C,
-    ) -> Result<Box<dyn Iterator<Item = TyValue> + '_>, EvalError> {
+    ) -> Result<Box<dyn Iterator<Item = Result<TyValue, EvalError>> + '_>, EvalError> {
         self.0.eval(ctx)
     }
     fn eval_interval<C: EvalContextInterval>(
@@ -597,14 +597,14 @@ impl AstNode for NodeInner {
     fn eval<C: EvalContext>(
         &self,
         ctx: &C,
-    ) -> Result<Box<dyn Iterator<Item = TyValue> + '_>, EvalError> {
+    ) -> Result<Box<dyn Iterator<Item = Result<TyValue, EvalError>> + '_>, EvalError> {
         match self {
-            Self::Const(c) => Ok(Box::new(once(c.value().clone()))),
+            Self::Const(c) => Ok(Box::new(once(Ok(c.value().clone())))),
             Self::Unary(u) => u.eval(ctx),
             Self::Binary(b) => b.eval(ctx),
             Self::Piecewise(p) => p.eval(ctx),
             Self::Var(v) => match ctx.resolve_var(v.ident()) {
-                Some(v) => Ok(Box::new(once(v.clone()))),
+                Some(v) => Ok(Box::new(once(Ok(v.clone())))),
                 None => Err(EvalError::UnknownIdent(v.ident().to_string())),
             },
         }
@@ -1072,16 +1072,16 @@ mod tests {
                 .unwrap()
                 .eval(&())
                 .unwrap()
-                .collect::<Vec<_>>(),
-            vec![8.into()],
+                .collect::<Result<Vec<_>, _>>(),
+            Ok(vec![8.into()]),
         );
         assert_eq!(
             Node::try_from("9 - 3 * 2")
                 .unwrap()
                 .eval(&())
                 .unwrap()
-                .collect::<Vec<_>>(),
-            vec![3.into()],
+                .collect::<Result<Vec<_>, _>>(),
+            Ok(vec![3.into()]),
         );
 
         assert_eq!(
@@ -1089,16 +1089,16 @@ mod tests {
                 .unwrap()
                 .eval(&())
                 .unwrap()
-                .collect::<Vec<_>>(),
-            vec![6.into(), 4.into()],
+                .collect::<Result<Vec<_>, _>>(),
+            Ok(vec![6.into(), 4.into()]),
         );
         assert_eq!(
             Node::try_from("2 * (5 ± 1)")
                 .unwrap()
                 .eval(&())
                 .unwrap()
-                .collect::<Vec<_>>(),
-            vec![12.into(), 8.into()],
+                .collect::<Result<Vec<_>, _>>(),
+            Ok(vec![12.into(), 8.into()]),
         );
 
         assert_eq!(
@@ -1106,8 +1106,8 @@ mod tests {
                 .unwrap()
                 .eval(&vec![("x", 2.into()), ("y", 1.into())])
                 .unwrap()
-                .collect::<Vec<_>>(),
-            vec![(-2).into(), 2.into()],
+                .collect::<Result<Vec<_>, _>>(),
+            Ok(vec![(-2).into(), 2.into()]),
         );
     }
 

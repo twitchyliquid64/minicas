@@ -58,7 +58,7 @@ impl Piecewise {
     pub fn eval<C: EvalContext>(
         &self,
         ctx: &C,
-    ) -> Result<Box<dyn Iterator<Item = TyValue> + '_>, EvalError> {
+    ) -> Result<Box<dyn Iterator<Item = Result<TyValue, EvalError>> + '_>, EvalError> {
         for (e, cond) in self.r#if.iter() {
             match cond.finite_eval(ctx)? {
                 TyValue::Bool(true) => {

@@ -397,10 +397,10 @@ impl Binary {
     pub fn eval<C: EvalContext>(
         &self,
         ctx: &C,
-    ) -> Result<Box<dyn Iterator<Item = TyValue> + '_>, EvalError> {
+    ) -> Result<Box<dyn Iterator<Item = Result<TyValue, EvalError>> + '_>, EvalError> {
         let (l, r) = (
-            self.lhs.eval(ctx)?.collect::<Vec<_>>(),
-            self.rhs.eval(ctx)?.collect::<Vec<_>>(),
+            self.lhs.eval(ctx)?.collect::<Result<Vec<_>, _>>()?,
+            self.rhs.eval(ctx)?.collect::<Result<Vec<_>, _>>()?,
         );
 
         use BinaryOp::*;
@@ -410,8 +410,8 @@ impl Binary {
                     .cartesian_product(r.into_iter())
                     .map(|(l, r)| {
                         [
-                            Binary::eval_op(&BinaryOp::Add, l.clone(), r.clone()).unwrap(),
-                            Binary::eval_op(&BinaryOp::Sub, l, r).unwrap(),
+                            Binary::eval_op(&BinaryOp::Add, l.clone(), r.clone()),
+                            Binary::eval_op(&BinaryOp::Sub, l, r),
                         ]
                     })
                     .flatten(),
@@ -421,8 +421,8 @@ impl Binary {
                 l.into_iter()
                     .cartesian_product(r.into_iter())
                     .map(|(l, r)| match Binary::eval_op(&self.op, l, r) {
-                        Ok(v) => v,
-                        Err(e) => panic!("{:?}", e),
+                        Ok(v) => Ok(v),
+                        Err(e) => Err(e),
                     }),
             )),
         }
