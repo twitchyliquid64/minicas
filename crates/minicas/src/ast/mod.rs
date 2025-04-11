@@ -35,6 +35,7 @@ pub enum EvalError {
     UnexpectedType(Vec<Ty>),
     UnknownIdent(String),
     Multiple,
+    UnboundedInterval,
 }
 
 /// Context that needs to be provided for evaluation.
@@ -98,7 +99,7 @@ pub trait AstNode: Clone + Sized + std::fmt::Debug {
     fn eval_interval<C: EvalContextInterval>(
         &self,
         ctx: &C,
-    ) -> Result<Box<dyn Iterator<Item = (TyValue, TyValue)> + '_>, EvalError>;
+    ) -> Result<Box<dyn Iterator<Item = Result<(TyValue, TyValue), EvalError>> + '_>, EvalError>;
 
     /// Recursively executes the given function on every node in the AST.
     /// The walk will end early if the given function returns false and
@@ -166,7 +167,8 @@ impl AstNode for Node {
     fn eval_interval<C: EvalContextInterval>(
         &self,
         ctx: &C,
-    ) -> Result<Box<dyn Iterator<Item = (TyValue, TyValue)> + '_>, EvalError> {
+    ) -> Result<Box<dyn Iterator<Item = Result<(TyValue, TyValue), EvalError>> + '_>, EvalError>
+    {
         self.n.eval_interval(ctx)
     }
     fn walk(&self, depth_first: bool, cb: &mut impl FnMut(&NodeInner) -> bool) {
@@ -367,7 +369,8 @@ impl AstNode for HN {
     fn eval_interval<C: EvalContextInterval>(
         &self,
         ctx: &C,
-    ) -> Result<Box<dyn Iterator<Item = (TyValue, TyValue)> + '_>, EvalError> {
+    ) -> Result<Box<dyn Iterator<Item = Result<(TyValue, TyValue), EvalError>> + '_>, EvalError>
+    {
         self.0.eval_interval(ctx)
     }
     fn walk(&self, depth_first: bool, cb: &mut impl FnMut(&NodeInner) -> bool) {
@@ -612,14 +615,15 @@ impl AstNode for NodeInner {
     fn eval_interval<C: EvalContextInterval>(
         &self,
         ctx: &C,
-    ) -> Result<Box<dyn Iterator<Item = (TyValue, TyValue)> + '_>, EvalError> {
+    ) -> Result<Box<dyn Iterator<Item = Result<(TyValue, TyValue), EvalError>> + '_>, EvalError>
+    {
         match self {
-            Self::Const(c) => Ok(Box::new(once((c.value().clone(), c.value().clone())))),
+            Self::Const(c) => Ok(Box::new(once(Ok((c.value().clone(), c.value().clone()))))),
             Self::Unary(u) => u.eval_interval(ctx),
             Self::Binary(b) => b.eval_interval(ctx),
             Self::Piecewise(p) => p.eval_interval(ctx),
             Self::Var(v) => match ctx.resolve_var(v.ident()) {
-                Some((v_min, v_max)) => Ok(Box::new(once((v_min.clone(), v_max.clone())))),
+                Some((v_min, v_max)) => Ok(Box::new(once(Ok((v_min.clone(), v_max.clone()))))),
                 None => Err(EvalError::UnknownIdent(v.ident().to_string())),
             },
         }
@@ -1121,8 +1125,8 @@ mod tests {
                     ("y", (5.into(), 6.into()))
                 ])
                 .unwrap()
-                .collect::<Vec<_>>(),
-            vec![((-11).into(), (-8).into())],
+                .collect::<Result<Vec<_>, _>>(),
+            Ok(vec![((-11).into(), (-8).into())]),
         );
     }
 

@@ -431,10 +431,15 @@ impl Binary {
     pub fn eval_interval<C: EvalContextInterval>(
         &self,
         ctx: &C,
-    ) -> Result<Box<dyn Iterator<Item = (TyValue, TyValue)> + '_>, EvalError> {
+    ) -> Result<Box<dyn Iterator<Item = Result<(TyValue, TyValue), EvalError>> + '_>, EvalError>
+    {
         let (l, r) = (
-            self.lhs.eval_interval(ctx)?.collect::<Vec<_>>(),
-            self.rhs.eval_interval(ctx)?.collect::<Vec<_>>(),
+            self.lhs
+                .eval_interval(ctx)?
+                .collect::<Result<Vec<_>, _>>()?,
+            self.rhs
+                .eval_interval(ctx)?
+                .collect::<Result<Vec<_>, _>>()?,
         );
 
         use BinaryOp::*;
@@ -446,23 +451,23 @@ impl Binary {
                         Add,
                         (TyValue::Rational(l_min), TyValue::Rational(l_max)),
                         (TyValue::Rational(r_min), TyValue::Rational(r_max)),
-                    ) => (
+                    ) => Ok((
                         TyValue::Rational(l_min + r_min),
                         TyValue::Rational(l_max + r_max),
-                    ),
+                    )),
                     (
                         Sub,
                         (TyValue::Rational(l_min), TyValue::Rational(l_max)),
                         (TyValue::Rational(r_min), TyValue::Rational(r_max)),
-                    ) => (
+                    ) => Ok((
                         TyValue::Rational(l_min - r_max),
                         TyValue::Rational(l_max - r_min),
-                    ),
+                    )),
                     (
                         Mul,
                         (TyValue::Rational(l1), TyValue::Rational(l2)),
                         (TyValue::Rational(r1), TyValue::Rational(r2)),
-                    ) => (
+                    ) => Ok((
                         TyValue::Rational(
                             (l1.clone() * r1.clone())
                                 .min(l1.clone() * r2.clone())
@@ -475,7 +480,7 @@ impl Binary {
                                 .max(l2.clone() * r1.clone())
                                 .max(l2.clone() * r2.clone()),
                         ),
-                    ),
+                    )),
 
                     (
                         Div,
@@ -486,13 +491,13 @@ impl Binary {
                         // If denominator includes zero
                         if r1 <= zero && r2 >= zero {
                             if r1 == zero && r2 == zero {
-                                panic!("div by zero");
+                                return Err(EvalError::DivByZero);
                             }
 
                             if l1 == zero && l2 == zero {
-                                return (zero.clone().into(), zero.into());
+                                return Ok((zero.clone().into(), zero.into()));
                             }
-                            panic!("whole range!");
+                            return Err(EvalError::UnboundedInterval);
                         }
 
                         let (a, b) = (l1, l2);
@@ -500,32 +505,32 @@ impl Binary {
 
                         // Case 1: [a,b] with a ≥ 0 and [c,d] with c > 0
                         if a >= zero && c > zero {
-                            return ((a / d).into(), (b / c).into());
+                            return Ok(((a / d).into(), (b / c).into()));
                         }
 
                         // Case 2: [a,b] with a ≥ 0 and [c,d] with d < 0
                         if a >= zero && d < zero {
-                            return ((b / d).into(), (a / c).into());
+                            return Ok(((b / d).into(), (a / c).into()));
                         }
 
                         // Case 3: [a,b] with b ≤ 0 and [c,d] with c > 0
                         if b <= zero && c > zero {
-                            return ((a / c).into(), (b / d).into());
+                            return Ok(((a / c).into(), (b / d).into()));
                         }
 
                         // Case 4: [a,b] with b ≤ 0 and [c,d] with d < 0
                         if b <= zero && d < zero {
-                            return ((b / c).into(), (a / d).into());
+                            return Ok(((b / c).into(), (a / d).into()));
                         }
 
                         // Case 5: [a,b] with a < 0 < b and [c,d] with c > 0
                         if a < zero && b > zero && c > zero {
-                            return ((a / c.clone()).into(), (b / c).into());
+                            return Ok(((a / c.clone()).into(), (b / c).into()));
                         }
 
                         // Case 6: [a,b] with a < 0 < b and [c,d] with d < 0
                         if a < zero && b > zero && d < zero {
-                            return ((b / d.clone()).into(), (a / d).into());
+                            return Ok(((b / d.clone()).into(), (a / d).into()));
                         }
 
                         unreachable!();
@@ -535,18 +540,18 @@ impl Binary {
                         Min,
                         (TyValue::Rational(l_min), TyValue::Rational(l_max)),
                         (TyValue::Rational(r_min), TyValue::Rational(r_max)),
-                    ) => (
+                    ) => Ok((
                         TyValue::Rational(l_min.min(r_min)),
                         TyValue::Rational(l_max.min(r_max)),
-                    ),
+                    )),
                     (
                         Max,
                         (TyValue::Rational(l_min), TyValue::Rational(l_max)),
                         (TyValue::Rational(r_min), TyValue::Rational(r_max)),
-                    ) => (
+                    ) => Ok((
                         TyValue::Rational(l_min.max(r_min)),
                         TyValue::Rational(l_max.max(r_max)),
-                    ),
+                    )),
 
                     _ => todo!(),
                 }),
@@ -729,16 +734,16 @@ mod tests {
                 .unwrap()
                 .eval_interval(&())
                 .unwrap()
-                .collect::<Vec<_>>(),
-            vec![(8.into(), 8.into())],
+                .collect::<Result<Vec<_>, _>>(),
+            Ok(vec![(8.into(), 8.into())]),
         );
         assert_eq!(
             Node::try_from("min(3, 4)")
                 .unwrap()
                 .eval_interval(&())
                 .unwrap()
-                .collect::<Vec<_>>(),
-            vec![(3.into(), 3.into())],
+                .collect::<Result<Vec<_>, _>>(),
+            Ok(vec![(3.into(), 3.into())]),
         );
 
         assert_eq!(
@@ -749,8 +754,8 @@ mod tests {
                     ("y", (5.into(), 6.into()))
                 ])
                 .unwrap()
-                .collect::<Vec<_>>(),
-            vec![(1.into(), 2.into())],
+                .collect::<Result<Vec<_>, _>>(),
+            Ok(vec![(1.into(), 2.into())]),
         );
         assert_eq!(
             Node::try_from("min(x, y)")
@@ -760,8 +765,8 @@ mod tests {
                     ("y", (2.into(), 4.into()))
                 ])
                 .unwrap()
-                .collect::<Vec<_>>(),
-            vec![(1.into(), 3.into())],
+                .collect::<Result<Vec<_>, _>>(),
+            Ok(vec![(1.into(), 3.into())]),
         );
 
         assert_eq!(
@@ -769,8 +774,8 @@ mod tests {
                 .unwrap()
                 .eval_interval(&vec![("a", (2.into(), 4.into())),])
                 .unwrap()
-                .collect::<Vec<_>>(),
-            vec![(1.into(), 2.into())],
+                .collect::<Result<Vec<_>, _>>(),
+            Ok(vec![(1.into(), 2.into())]),
         );
 
         assert_eq!(
@@ -781,8 +786,8 @@ mod tests {
                     ("b", (2.into(), 4.into()))
                 ])
                 .unwrap()
-                .collect::<Vec<_>>(),
-            vec![(0.25.into(), 1.5.into())],
+                .collect::<Result<Vec<_>, _>>(),
+            Ok(vec![(0.25.into(), 1.5.into())]),
         );
     }
 }

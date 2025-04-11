@@ -76,15 +76,19 @@ impl Piecewise {
     pub fn eval_interval<C: EvalContextInterval>(
         &self,
         ctx: &C,
-    ) -> Result<Box<dyn Iterator<Item = (TyValue, TyValue)> + '_>, EvalError> {
+    ) -> Result<Box<dyn Iterator<Item = Result<(TyValue, TyValue), EvalError>> + '_>, EvalError>
+    {
         for (e, cond) in self.r#if.iter() {
-            match cond.eval_interval(ctx)?.next().unwrap().0 {
-                TyValue::Bool(true) => {
+            match cond.eval_interval(ctx)?.next().unwrap() {
+                Ok((TyValue::Bool(true), _)) => {
                     return e.eval_interval(ctx);
                 }
-                TyValue::Bool(false) => {}
-                v => {
-                    return Err(EvalError::UnexpectedType(vec![v.ty()]));
+                Ok((TyValue::Bool(false), _)) => {}
+                Ok(v) => {
+                    return Err(EvalError::UnexpectedType(vec![v.0.ty()]));
+                }
+                Err(e) => {
+                    return Err(e);
                 }
             }
         }

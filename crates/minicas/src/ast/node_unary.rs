@@ -136,35 +136,39 @@ impl Unary {
     pub fn eval_interval<C: EvalContextInterval>(
         &self,
         ctx: &C,
-    ) -> Result<Box<dyn Iterator<Item = (TyValue, TyValue)> + '_>, EvalError> {
+    ) -> Result<Box<dyn Iterator<Item = Result<(TyValue, TyValue), EvalError>> + '_>, EvalError>
+    {
         use UnaryOp::*;
         let iter = self.val.eval_interval(ctx)?;
-        Ok(Box::new(iter.map(|(min, max)| match self.op {
-            Negate => match (min, max) {
-                (TyValue::Rational(min), TyValue::Rational(max)) => {
-                    (TyValue::Rational(-max), TyValue::Rational(-min))
-                }
-                _ => unreachable!(),
-            },
-            Abs => {
-                use num::Signed;
-                match (min, max) {
+        Ok(Box::new(iter.map(|res| match res {
+            Ok((min, max)) => match self.op {
+                Negate => match (min, max) {
                     (TyValue::Rational(min), TyValue::Rational(max)) => {
-                        use num::rational::BigRational;
-                        let zero = BigRational::from_integer(0.into());
-
-                        if min >= zero {
-                            // already correct
-                            (TyValue::Rational(min), TyValue::Rational(max))
-                        } else if max < zero {
-                            (TyValue::Rational(-max), TyValue::Rational(-min))
-                        } else {
-                            (0.into(), TyValue::Rational(min.abs().max(max.abs())))
-                        }
+                        Ok((TyValue::Rational(-max), TyValue::Rational(-min)))
                     }
-                    _ => unreachable!(),
+                    (min, max) => Err(EvalError::UnexpectedType(vec![min.ty(), max.ty()])),
+                },
+                Abs => {
+                    use num::Signed;
+                    match (min, max) {
+                        (TyValue::Rational(min), TyValue::Rational(max)) => {
+                            use num::rational::BigRational;
+                            let zero = BigRational::from_integer(0.into());
+
+                            if min >= zero {
+                                // already correct
+                                Ok((TyValue::Rational(min), TyValue::Rational(max)))
+                            } else if max < zero {
+                                Ok((TyValue::Rational(-max), TyValue::Rational(-min)))
+                            } else {
+                                Ok((0.into(), TyValue::Rational(min.abs().max(max.abs()))))
+                            }
+                        }
+                        (min, max) => Err(EvalError::UnexpectedType(vec![min.ty(), max.ty()])),
+                    }
                 }
-            }
+            },
+            Err(e) => Err(e),
         })))
     }
 
