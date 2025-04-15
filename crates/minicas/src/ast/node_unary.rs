@@ -161,7 +161,10 @@ impl Unary {
                             } else if max < zero {
                                 Ok((TyValue::Rational(-max), TyValue::Rational(-min)))
                             } else {
-                                Ok((0.into(), TyValue::Rational(min.abs().max(max.abs()))))
+                                Ok((
+                                    TyValue::Rational(-min.clone()),
+                                    TyValue::Rational(min.abs().max(max.abs())),
+                                ))
                             }
                         }
                         (min, max) => Err(EvalError::UnexpectedType(vec![min.ty(), max.ty()])),
@@ -226,6 +229,29 @@ mod tests {
         assert_eq!(
             Unary::abs(TyValue::from(3)).finite_eval(&()),
             Ok(TyValue::from(3))
+        );
+    }
+
+    #[test]
+    fn interval_eval() {
+        use crate::ast::Node;
+
+        assert_eq!(
+            Node::try_from("-x")
+                .unwrap()
+                .eval_interval(&vec![("x", ((-10).into(), 12.into())),])
+                .unwrap()
+                .collect::<Result<Vec<_>, _>>(),
+            Ok(vec![((-12).into(), 10.into())]),
+        );
+
+        assert_eq!(
+            Node::try_from("abs(x)")
+                .unwrap()
+                .eval_interval(&vec![("x", ((-10).into(), 12.into())),])
+                .unwrap()
+                .collect::<Result<Vec<_>, _>>(),
+            Ok(vec![(10.into(), 12.into())]),
         );
     }
 }
