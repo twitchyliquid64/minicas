@@ -1129,6 +1129,23 @@ mod tests {
                 .collect::<Result<Vec<_>, _>>(),
             Ok(vec![((-11).into(), (-8).into())]),
         );
+
+        // Smoke test over a large range
+        for x in -8..=8 {
+            for y in -8..=8 {
+                assert!(
+                    Node::try_from("sqrt(pow(-2 - x, 2) + pow(3 - y, 2)) + abs(x+y)")
+                        .unwrap()
+                        .eval_interval(&vec![
+                            ("x", (x.into(), (x + 2).into())),
+                            ("y", (y.into(), (y + 2).into())),
+                        ])
+                        .unwrap()
+                        .collect::<Result<Vec<_>, _>>()
+                        .is_ok(),
+                );
+            }
+        }
     }
 
     #[test]

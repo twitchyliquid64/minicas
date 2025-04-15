@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/minicas", "crates/minicas-crs"]
+members = ["crates/minicas-core", "crates/minicas-crs"]
 resolver = "2"
 
 [workspace.dependencies]
@@ -14,4 +14,4 @@ toml = { version = "^0.8", features = ["parse"] }
 serde = { version = "^1.0", features = ["derive"] }
 
 # our crates
-minicas = { version = "0.0.1", path = "crates/minicas" }
+minicas-core = { version = "0.0.1", path = "crates/minicas-core" }

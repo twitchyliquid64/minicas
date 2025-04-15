@@ -3,7 +3,7 @@ use std::fs;
 use std::io::Write;
 use std::path::Path;
 
-use minicas::rules::RuleSpec;
+use minicas_core::rules::RuleSpec;
 use std::collections::BTreeMap;
 use toml::de;
 

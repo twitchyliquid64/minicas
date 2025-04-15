@@ -1,6 +1,6 @@
 use lazy_static::lazy_static;
-use minicas::ast::{AstNode, Node};
-use minicas::rules::{Rule, RuleSpec};
+use minicas_core::ast::{AstNode, Node};
+use minicas_core::rules::{Rule, RuleSpec};
 use std::collections::HashMap;
 use toml::de;
 
