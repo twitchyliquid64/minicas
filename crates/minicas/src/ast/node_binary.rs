@@ -553,6 +553,42 @@ impl Binary {
                         TyValue::Rational(l_max.max(r_max)),
                     )),
 
+                    // HACK: Supports pow(x, 2), but eventually should support all exponents.
+                    (
+                        Pow,
+                        (TyValue::Rational(l_min), TyValue::Rational(l_max)),
+                        (TyValue::Rational(r_min), TyValue::Rational(r_max)),
+                    ) => {
+                        let two = BigRational::from_integer(2.into());
+
+                        if r_min == two && r_max == two {
+                            use num::traits::Pow;
+                            let (p1, p2): (BigRational, BigRational) = (l_min.pow(2), l_max.pow(2));
+                            return Ok((
+                                TyValue::Rational(p1.clone().min(p2.clone())),
+                                TyValue::Rational(p1.max(p2)),
+                            ));
+                        }
+                        todo!();
+                    }
+                    // HACK: Supports root(x, 2), but eventually should support all roots.
+                    (
+                        Root,
+                        (TyValue::Rational(l_min), TyValue::Rational(l_max)),
+                        (TyValue::Rational(r_min), TyValue::Rational(r_max)),
+                    ) => {
+                        let two = BigRational::from_integer(2.into());
+
+                        if r_min == two && r_max == two {
+                            use num::ToPrimitive;
+                            let p1 = l_min.to_f64().unwrap().powf(2.0f64.recip());
+                            let p2 = l_max.to_f64().unwrap().powf(2.0f64.recip());
+
+                            return Ok((p1.into(), p2.into()));
+                        }
+                        todo!();
+                    }
+
                     _ => todo!(),
                 }),
         ))
@@ -788,6 +824,23 @@ mod tests {
                 .unwrap()
                 .collect::<Result<Vec<_>, _>>(),
             Ok(vec![(0.25.into(), 1.5.into())]),
+        );
+
+        assert_eq!(
+            Node::try_from("pow(a, 2)")
+                .unwrap()
+                .eval_interval(&vec![("a", (1.into(), 3.into())),])
+                .unwrap()
+                .collect::<Result<Vec<_>, _>>(),
+            Ok(vec![(1.into(), 9.into())]),
+        );
+        assert_eq!(
+            Node::try_from("sqrt(a)")
+                .unwrap()
+                .eval_interval(&vec![("a", (4.into(), 9.into())),])
+                .unwrap()
+                .collect::<Result<Vec<_>, _>>(),
+            Ok(vec![(2.into(), 3.into())]),
         );
     }
 }
