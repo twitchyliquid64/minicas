@@ -36,6 +36,7 @@ pub enum EvalError {
     UnknownIdent(String),
     Multiple,
     UnboundedInterval,
+    IndeterminatePredicate,
 }
 
 /// Context that needs to be provided for evaluation.

@@ -589,6 +589,51 @@ impl Binary {
                         todo!();
                     }
 
+                    (
+                        Cmp(CmpOp::LessThan(include_eq)),
+                        (TyValue::Rational(l_min), TyValue::Rational(l_max)),
+                        (TyValue::Rational(r_min), TyValue::Rational(r_max)),
+                    ) => {
+                        if l_max > r_min && l_min < r_max {
+                            // Some overlap, comparison cannot be determined
+                            return Err(EvalError::IndeterminatePredicate);
+                        }
+                        let res = if include_eq {
+                            l_max < r_min
+                        } else {
+                            l_max <= r_min
+                        };
+                        return Ok((res.into(), res.into()));
+                    }
+                    (
+                        Cmp(CmpOp::GreaterThan(include_eq)),
+                        (TyValue::Rational(l_min), TyValue::Rational(l_max)),
+                        (TyValue::Rational(r_min), TyValue::Rational(r_max)),
+                    ) => {
+                        if l_max > r_min && l_min < r_max {
+                            // Some overlap, comparison cannot be determined
+                            return Err(EvalError::IndeterminatePredicate);
+                        }
+                        let res = if include_eq {
+                            l_max > r_min
+                        } else {
+                            l_max >= r_min
+                        };
+                        return Ok((res.into(), res.into()));
+                    }
+                    (
+                        Cmp(CmpOp::Equals),
+                        (TyValue::Rational(l_min), TyValue::Rational(l_max)),
+                        (TyValue::Rational(r_min), TyValue::Rational(r_max)),
+                    ) => {
+                        if l_max > r_min && l_min < r_max {
+                            // Some overlap, comparison cannot be determined
+                            return Err(EvalError::IndeterminatePredicate);
+                        }
+                        let res = l_max == r_min;
+                        return Ok((res.into(), res.into()));
+                    }
+
                     _ => todo!(),
                 }),
         ))
@@ -841,6 +886,40 @@ mod tests {
                 .unwrap()
                 .collect::<Result<Vec<_>, _>>(),
             Ok(vec![(2.into(), 3.into())]),
+        );
+
+        assert_eq!(
+            Node::try_from("a < b")
+                .unwrap()
+                .eval_interval(&vec![
+                    ("a", (1.into(), 2.into())),
+                    ("b", (3.into(), 4.into())),
+                ])
+                .unwrap()
+                .collect::<Result<Vec<_>, _>>(),
+            Ok(vec![(true.into(), true.into())]),
+        );
+        assert_eq!(
+            Node::try_from("a <= b")
+                .unwrap()
+                .eval_interval(&vec![
+                    ("a", (4.into(), 5.into())),
+                    ("b", (3.into(), 4.into())),
+                ])
+                .unwrap()
+                .collect::<Result<Vec<_>, _>>(),
+            Ok(vec![(false.into(), false.into())]),
+        );
+        assert_eq!(
+            Node::try_from("a == b")
+                .unwrap()
+                .eval_interval(&vec![
+                    ("a", (4.into(), 5.into())),
+                    ("b", (3.into(), 4.into())),
+                ])
+                .unwrap()
+                .collect::<Result<Vec<_>, _>>(),
+            Ok(vec![(false.into(), false.into())]),
         );
     }
 }
