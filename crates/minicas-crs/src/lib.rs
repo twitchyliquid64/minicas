@@ -1,3 +1,18 @@
+//! Mechanical simplification / factorization rules for algebraic expressions.
+//!
+//! Companion crate to [minicas_core].
+//!
+//! ```
+//! # use minicas_crs::simplify;
+//! # use minicas_core::ast::*;
+//! let mut n = Node::try_from("5x * 2x").unwrap();
+//!
+//! // true means apply the full set of rules (i.e. factorization rules)
+//! simplify(&mut n, true).unwrap();
+//!
+//! assert_eq!(n, Node::try_from("10 * pow(x, 2)").unwrap());
+//! ```
+
 use lazy_static::lazy_static;
 use minicas_core::ast::{AstNode, Node};
 use minicas_core::rules::{Rule, RuleSpec};
@@ -19,6 +34,16 @@ lazy_static! {
 }
 
 /// Iteratively applies the simplification rules to the given node until none match.
+///
+/// When `all` is true, factorization and more aggressive simplification rules are additionally applied.
+///
+/// ```
+/// # use minicas_crs::simplify;
+/// # use minicas_core::ast::{AstNode, Node};
+/// let mut n = Node::try_from("(a - a) / b").unwrap();
+/// simplify(&mut n, false).unwrap();
+/// assert_eq!(n, Node::try_from("0").unwrap());
+/// ```
 pub fn simplify(n: &mut Node, all: bool) -> Result<(), ()> {
     let (mut rule_matched, mut i) = (true, 0usize);
     while rule_matched && i < 50 {

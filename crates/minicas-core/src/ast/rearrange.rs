@@ -79,6 +79,18 @@ impl ReverseOp {
 /// Attempts to rearrange an equality equation to make the given target the subject.
 ///
 /// `rhs` must contain an expression containing the target. `lhs` will be mutated.
+///
+/// ```
+/// # use minicas_core::ast::*;
+/// // Rearrange: y = 3x + 2 (for x)
+/// let mut lhs = NodeInner::new_var("y");
+/// make_subject(
+///     &mut lhs,
+///     &Node::try_from("3x + 2").unwrap(),
+///     &Node::try_from("x").unwrap()
+/// ).unwrap();
+/// assert_eq!(&lhs, Node::try_from("(y-2) / 3").unwrap().as_inner());
+/// ```
 pub fn make_subject(
     lhs: &mut NodeInner,
     rhs: &NodeInner,

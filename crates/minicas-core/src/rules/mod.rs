@@ -1,3 +1,5 @@
+//! Defines the syntax and processing for the rules engine: used by the `minicas_crs` crate.
+
 use crate::ast::{AstNode, Node, NodeInner};
 use crate::pred::Predicate;
 use serde::{Deserialize, Deserializer};

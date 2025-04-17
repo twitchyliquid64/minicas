@@ -2,6 +2,14 @@
 use crate::ast::{AstNode, Binary, EvalError, NodeInner, Unary};
 
 /// Performs constant folding on an AST.
+///
+/// ```
+/// # use minicas_core::ast::{Node, Piecewise};
+/// # use minicas_core::ast::fold;
+/// let mut n = Node::try_from("2 + 3").unwrap();
+/// assert_eq!(fold(&mut n), Ok(()),);
+/// assert_eq!(n, Node::try_from("5").unwrap());
+/// ```
 pub fn fold<N: AstNode>(n: &mut N) -> Result<(), EvalError> {
     let mut err = Ok(());
     n.walk_mut(true, &mut |n| {
