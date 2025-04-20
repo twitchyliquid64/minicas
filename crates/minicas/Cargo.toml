@@ -6,6 +6,17 @@ license = "MIT OR Apache-2.0"
 
 rust-version = "1.78"
 
+description = "Minicas, a simple + smol Computer Algebra System."
+homepage = "https://github.com/twitchyliquid64/minicas"
+documentation = "https://docs.rs/minicas"
+repository = "https://github.com/twitchyliquid64/minicas"
+
+keywords = [
+    "algebra",
+    "equations",
+    "cas",
+]
+
 [dependencies]
 minicas-core.workspace = true
 minicas-crs.workspace = true

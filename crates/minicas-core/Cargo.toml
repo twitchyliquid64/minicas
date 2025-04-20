@@ -6,6 +6,17 @@ license = "MIT OR Apache-2.0"
 
 rust-version = "1.78"
 
+description = "Core crate for minicas, a simple + smol Computer Algebra System."
+homepage = "https://github.com/twitchyliquid64/minicas"
+documentation = "https://docs.rs/minicas-core"
+repository = "https://github.com/twitchyliquid64/minicas"
+
+keywords = [
+    "algebra",
+    "equations",
+    "cas",
+]
+
 [features]
 default = ["parsing"]
 parsing = ["dep:nom", "dep:nom-language"]
